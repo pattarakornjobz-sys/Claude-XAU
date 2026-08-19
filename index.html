@@ -4,57 +4,112 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>XAUUSD Analysis Dashboard</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root{
-    --bg:#0b0d10; --card:#14171c; --border:#252932;
-    --text:#e8eaed; --muted:#8a919e;
-    --long:#22c55e; --short:#ef4444; --wait:#eab308;
-    --accent:#d4af37;
+    --page:#0d0d0d; --surface:#1a1a19; --border:rgba(255,255,255,.10);
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --gridline:#2c2c2a; --baseline:#383835;
+    --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
+    --gold:#d4af37;
   }
   *{box-sizing:border-box}
   body{
-    margin:0; font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
-    background:var(--bg); color:var(--text); padding:24px;
-    max-width:640px; margin-left:auto; margin-right:auto;
+    margin:0; font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
+    background:var(--page); color:var(--text-primary); padding:20px 16px 60px;
+    max-width:980px; margin-left:auto; margin-right:auto;
   }
-  h1{font-size:20px; font-weight:600; margin:0 0 4px; display:flex; align-items:center; gap:8px}
-  .sub{color:var(--muted); font-size:13px; margin-bottom:4px}
+  h1{font-size:19px; font-weight:600; margin:0 0 4px; display:flex; align-items:center; gap:8px}
+  .sub{color:var(--text-muted); font-size:12.5px; margin-bottom:14px}
   .disclaimer{
-    color:var(--muted); font-size:11.5px; background:rgba(234,179,8,.08);
-    border:1px solid rgba(234,179,8,.25); border-radius:8px; padding:8px 12px; margin-bottom:24px; line-height:1.5;
+    color:var(--text-secondary); font-size:11.5px; background:rgba(250,178,25,.07);
+    border:1px solid rgba(250,178,25,.35); border-radius:8px; padding:9px 12px; margin-bottom:20px; line-height:1.55;
   }
   .card{
-    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
     padding:20px; margin-bottom:16px;
   }
-  .price{font-size:32px; font-weight:700; color:var(--accent)}
+  .price-row{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap}
+  .price{font-size:34px; font-weight:600; color:var(--gold); line-height:1.1}
+  .updated{color:var(--text-muted); font-size:12px; margin-top:5px}
+
   .badge{
-    display:inline-block; padding:4px 12px; border-radius:999px; font-size:13px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px; padding:5px 13px; border-radius:999px;
+    font-size:13px; font-weight:600; border:1px solid transparent; white-space:nowrap;
   }
-  .badge-Long{background:rgba(34,197,94,.15); color:var(--long)}
-  .badge-Short{background:rgba(239,68,68,.15); color:var(--short)}
-  .badge-Wait{background:rgba(234,179,8,.15); color:var(--wait)}
-  .grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px}
-  .label{color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px}
-  .value{font-size:15px; line-height:1.5}
+  .badge::before{content:''; width:7px; height:7px; border-radius:999px; background:currentColor}
+  .badge-Long{color:var(--good); background:rgba(12,163,12,.12); border-color:rgba(12,163,12,.35)}
+  .badge-Short{color:var(--critical); background:rgba(208,59,59,.12); border-color:rgba(208,59,59,.35)}
+  .badge-Wait{color:var(--warning); background:rgba(250,178,25,.12); border-color:rgba(250,178,25,.35)}
+  .badge-sm{font-size:11px; padding:3px 9px}
+
+  .section-label{
+    color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;
+  }
+  .body-text{font-size:14px; line-height:1.65; color:var(--text-secondary)}
+  .body-text.primary{color:var(--text-primary)}
+
+  /* chart */
+  .chart-tabs{display:flex; gap:6px; margin-bottom:12px}
+  .chart-tab{
+    background:transparent; border:1px solid var(--border); color:var(--text-secondary);
+    font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; cursor:pointer;
+    font-family:inherit;
+  }
+  .chart-tab.active{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
+  #chart{width:100%; height:320px; border-radius:8px; overflow:hidden}
+
+  /* timeframe cards grid */
+  .tf-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+  @media (max-width:760px){ .tf-grid{grid-template-columns:1fr} }
+  .tf-card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px}
+  .tf-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .tf-name{font-size:14px; font-weight:700; color:var(--text-primary)}
+  .tf-trend{font-size:12px; color:var(--text-muted); margin-bottom:10px}
+  .tf-note{font-size:12.5px; line-height:1.6; color:var(--text-secondary); margin-bottom:12px; min-height:38px}
+  .tf-levels{display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px}
+  .tf-levels .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px}
+  .tf-levels .val{color:var(--text-secondary); line-height:1.6}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px}
+  @media (max-width:560px){ .grid2{grid-template-columns:1fr} }
+
   .history-item{
-    padding:12px 0; border-bottom:1px solid var(--border); font-size:13px;
-    display:flex; justify-content:space-between; gap:12px; color:var(--muted);
+    padding:11px 0; border-bottom:1px solid var(--border); font-size:13px;
+    display:flex; justify-content:space-between; align-items:center; gap:12px; color:var(--text-muted);
   }
   .history-item:last-child{border-bottom:none}
-  .loading{color:var(--muted); text-align:center; padding:40px}
-  .error{color:var(--short); text-align:center; padding:40px; font-size:13px; line-height:1.7}
+  .history-item .h-price{color:var(--text-secondary); font-variant-numeric:tabular-nums}
+
+  .loading{color:var(--text-muted); text-align:center; padding:50px 0}
+  .error{color:var(--critical); text-align:center; padding:40px 0; font-size:13px; line-height:1.7}
 </style>
 </head>
 <body>
 
 <h1>🥇 XAUUSD Analysis</h1>
-<div class="sub">อัปเดตอัตโนมัติทุกชั่วโมง 07:00–22:00 น.</div>
+<div class="sub">อัปเดตอัตโนมัติทุก 4 ชั่วโมง · จันทร์–ศุกร์ 07:00–23:00 น. · Multi-timeframe 4H / 1H / 15M</div>
 <div class="disclaimer">⚠️ ข้อมูลนี้เป็นการสรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เองเท่านั้น ไม่ใช่คำแนะนำการลงทุน และไม่รับประกันผลลัพธ์ใดๆ โปรดใช้วิจารณญาณและบริหารความเสี่ยงด้วยตนเอง</div>
 
 <div id="latest" class="card loading">กำลังโหลด...</div>
-<div id="history" class="card" style="display:none">
-  <div class="label" style="margin-bottom:12px">ประวัติล่าสุด</div>
+
+<div id="chartCard" class="card" style="display:none">
+  <div class="section-label">กราฟราคา</div>
+  <div class="chart-tabs" id="chartTabs">
+    <button class="chart-tab" data-tf="4h">4H</button>
+    <button class="chart-tab active" data-tf="1h">1H</button>
+    <button class="chart-tab" data-tf="15m">15M</button>
+  </div>
+  <div id="chart"></div>
+</div>
+
+<div id="tfSection" style="display:none">
+  <div class="section-label" style="margin:4px 0 10px">รายละเอียดแต่ละ Timeframe</div>
+  <div class="tf-grid" id="tfGrid"></div>
+</div>
+
+<div id="history" class="card" style="display:none; margin-top:16px">
+  <div class="section-label" style="margin-bottom:12px">ประวัติล่าสุด</div>
   <div id="historyList"></div>
 </div>
 
@@ -63,6 +118,10 @@
   // (การป้องกันการเขียน/แก้ไขข้อมูลทำผ่าน Row Level Security policy ในฝั่ง Supabase แทน)
   const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
+
+  const TF_LABEL = { '4h': '4H', '1h': '1H', '15m': '15M' };
+  let latestRow = null;
+  let chart, series, activeTf = '1h';
 
   async function loadData() {
     try {
@@ -76,7 +135,10 @@
         document.getElementById('latest').textContent = 'ยังไม่มีข้อมูล (รอรอบวิเคราะห์แรกทำงาน)';
         return;
       }
-      renderLatest(rows[0]);
+      latestRow = rows[0];
+      renderLatest(latestRow);
+      renderChartCard(latestRow);
+      renderTimeframes(latestRow);
       renderHistory(rows.slice(1));
     } catch (e) {
       document.getElementById('latest').className = 'card error';
@@ -89,45 +151,119 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function badge(bias, small) {
+    const cls = ['Long', 'Short', 'Wait'].includes(bias) ? bias : 'Wait';
+    return `<span class="badge badge-${cls}${small ? ' badge-sm' : ''}">${esc(bias || 'Wait')}</span>`;
+  }
+
   function renderLatest(row) {
     const t = new Date(row.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
     document.getElementById('latest').className = 'card';
     document.getElementById('latest').innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start">
+      <div class="price-row">
         <div>
           <div class="price">$${esc(row.price_snapshot)}</div>
-          <div class="sub" style="margin:4px 0 0">${esc(t)}</div>
+          <div class="updated">อัปเดตล่าสุด ${esc(t)}</div>
         </div>
-        <span class="badge badge-${esc(row.bias)}">${esc(row.bias)}</span>
+        ${badge(row.bias)}
       </div>
-      <div class="grid">
+      <div class="grid2">
         <div>
-          <div class="label">เทรนด์</div>
-          <div class="value">${esc(row.trend) || '-'}</div>
+          <div class="section-label">แผนโดยรวม (Confluence)</div>
+          <div class="body-text primary">${esc(row.plan_summary) || '-'}</div>
         </div>
         <div>
-          <div class="label">โครงสร้าง</div>
-          <div class="value">${esc(row.structure_note) || '-'}</div>
-        </div>
-        <div>
-          <div class="label">แนวรับ</div>
-          <div class="value">${esc(row.support_levels) || '-'}</div>
-        </div>
-        <div>
-          <div class="label">แนวต้าน</div>
-          <div class="value">${esc(row.resistance_levels) || '-'}</div>
+          <div class="section-label">ข้อควรระวัง</div>
+          <div class="body-text">${esc(row.confidence_note) || '-'}</div>
         </div>
       </div>
-      <div style="margin-top:16px">
-        <div class="label">แผน</div>
-        <div class="value">${esc(row.plan_summary) || '-'}</div>
-      </div>
-      ${row.confidence_note ? `
-      <div style="margin-top:16px">
-        <div class="label">ข้อควรระวัง</div>
-        <div class="value">${esc(row.confidence_note)}</div>
+      ${row.structure_note ? `
+      <div style="margin-top:14px">
+        <div class="section-label">ภาพรวมโครงสร้างราคา</div>
+        <div class="body-text">${esc(row.structure_note)}</div>
       </div>` : ''}
     `;
+  }
+
+  function renderTimeframes(row) {
+    const tfs = row.timeframes_json;
+    const grid = document.getElementById('tfGrid');
+    if (!tfs || typeof tfs !== 'object') {
+      document.getElementById('tfSection').style.display = 'none';
+      return;
+    }
+    document.getElementById('tfSection').style.display = 'block';
+    grid.innerHTML = ['4h', '1h', '15m'].map((key) => {
+      const d = tfs[key];
+      if (!d) return '';
+      return `
+        <div class="tf-card">
+          <div class="tf-head">
+            <span class="tf-name">${TF_LABEL[key]}</span>
+            ${badge(d.bias, true)}
+          </div>
+          <div class="tf-trend">เทรนด์: ${esc(d.trend) || '-'}</div>
+          <div class="tf-note">${esc(d.structure_note) || '-'}</div>
+          <div class="tf-levels">
+            <div>
+              <div class="lbl">แนวรับ</div>
+              <div class="val">${esc((d.support_levels || []).join(', ')) || '-'}</div>
+            </div>
+            <div>
+              <div class="lbl">แนวต้าน</div>
+              <div class="val">${esc((d.resistance_levels || []).join(', ')) || '-'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderChartCard(row) {
+    const candles = row.raw_candles;
+    if (!candles || typeof candles !== 'object' || typeof LightweightCharts === 'undefined') {
+      return; // ไม่มีข้อมูลกราฟ หรือโหลดไลบรารีไม่สำเร็จ — ข้ามส่วนกราฟไปเงียบๆ
+    }
+    document.getElementById('chartCard').style.display = 'block';
+
+    if (!chart) {
+      chart = LightweightCharts.createChart(document.getElementById('chart'), {
+        autoSize: true,
+        layout: { background: { color: 'transparent' }, textColor: '#c3c2b7', fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
+        grid: { vertLines: { color: '#2c2c2a' }, horzLines: { color: '#2c2c2a' } },
+        rightPriceScale: { borderColor: '#383835' },
+        timeScale: { borderColor: '#383835', timeVisible: true, secondsVisible: false },
+      });
+      series = chart.addCandlestickSeries({
+        upColor: '#0ca30c', downColor: '#d03b3b', borderVisible: false,
+        wickUpColor: '#0ca30c', wickDownColor: '#d03b3b',
+      });
+
+      document.getElementById('chartTabs').addEventListener('click', (e) => {
+        const btn = e.target.closest('.chart-tab');
+        if (!btn) return;
+        document.querySelectorAll('.chart-tab').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeTf = btn.dataset.tf;
+        setChartData();
+      });
+    }
+    setChartData();
+  }
+
+  function setChartData() {
+    if (!latestRow || !series) return;
+    const arr = (latestRow.raw_candles || {})[activeTf];
+    if (!Array.isArray(arr) || !arr.length) return;
+    const data = arr
+      .map((c) => ({
+        time: Math.floor(new Date(c.time.replace(' ', 'T') + 'Z').getTime() / 1000),
+        open: c.open, high: c.high, low: c.low, close: c.close,
+      }))
+      .filter((c) => Number.isFinite(c.time))
+      .sort((a, b) => a.time - b.time);
+    series.setData(data);
+    chart.timeScale().fitContent();
   }
 
   function renderHistory(rows) {
@@ -138,8 +274,8 @@
         const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
         return `<div class="history-item">
           <span>${esc(t)}</span>
-          <span>$${esc(r.price_snapshot)}</span>
-          <span class="badge badge-${esc(r.bias)}" style="padding:2px 10px; font-size:11px">${esc(r.bias)}</span>
+          <span class="h-price">$${esc(r.price_snapshot)}</span>
+          ${badge(r.bias, true)}
         </div>`;
       })
       .join('');
