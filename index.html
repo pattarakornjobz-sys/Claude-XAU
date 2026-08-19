@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>XAUUSD Analysis Dashboard</title>
+<style>
+  :root{
+    --bg:#0b0d10; --card:#14171c; --border:#252932;
+    --text:#e8eaed; --muted:#8a919e;
+    --long:#22c55e; --short:#ef4444; --wait:#eab308;
+    --accent:#d4af37;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
+    background:var(--bg); color:var(--text); padding:24px;
+  }
+  h1{font-size:20px; font-weight:600; margin:0 0 4px; display:flex; align-items:center; gap:8px}
+  .sub{color:var(--muted); font-size:13px; margin-bottom:24px}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:20px; margin-bottom:16px;
+  }
+  .price{font-size:32px; font-weight:700; color:var(--accent)}
+  .badge{
+    display:inline-block; padding:4px 12px; border-radius:999px; font-size:13px; font-weight:600;
+  }
+  .badge-Long{background:rgba(34,197,94,.15); color:var(--long)}
+  .badge-Short{background:rgba(239,68,68,.15); color:var(--short)}
+  .badge-Wait{background:rgba(234,179,8,.15); color:var(--wait)}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px}
+  .label{color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px}
+  .value{font-size:15px; line-height:1.5}
+  .history-item{
+    padding:12px 0; border-bottom:1px solid var(--border); font-size:13px;
+    display:flex; justify-content:space-between; gap:12px; color:var(--muted);
+  }
+  .history-item:last-child{border-bottom:none}
+  .loading{color:var(--muted); text-align:center; padding:40px}
+</style>
+</head>
+<body>
+
+<h1>🥇 XAUUSD Analysis</h1>
+<div class="sub">อัปเดตอัตโนมัติทุกชั่วโมง 07:00–22:00 น. — ไม่ใช่คำแนะนำการลงทุน</div>
+
+<div id="latest" class="card loading">กำลังโหลด...</div>
+<div id="history" class="card" style="display:none">
+  <div class="label" style="margin-bottom:12px">ประวัติล่าสุด</div>
+  <div id="historyList"></div>
+</div>
+
+<script>
+  // แก้บรรทัดนี้ให้เป็น anon key ของโปรเจกต์ (Settings → API → anon public)
+  const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
+
+  async function loadData() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/xauusd_analysis?select=*&order=created_at.desc&limit=20`,
+      { headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    const rows = await res.json();
+    if (!rows.length) {
+      document.getElementById('latest').textContent = 'ยังไม่มีข้อมูล';
+      return;
+    }
+    renderLatest(rows[0]);
+    renderHistory(rows.slice(1));
+  }
+
+  function renderLatest(row) {
+    const t = new Date(row.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    document.getElementById('latest').innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start">
+        <div>
+          <div class="price">$${row.price_snapshot}</div>
+          <div class="sub" style="margin:4px 0 0">${t}</div>
+        </div>
+        <span class="badge badge-${row.bias}">${row.bias}</span>
+      </div>
+      <div class="grid">
+        <div>
+          <div class="label">เทรนด์</div>
+          <div class="value">${row.trend || '-'}</div>
+        </div>
+        <div>
+          <div class="label">โครงสร้าง</div>
+          <div class="value">${row.structure_note || '-'}</div>
+        </div>
+        <div>
+          <div class="label">แนวรับ</div>
+          <div class="value">${row.support_levels || '-'}</div>
+        </div>
+        <div>
+          <div class="label">แนวต้าน</div>
+          <div class="value">${row.resistance_levels || '-'}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <div class="label">แผน</div>
+        <div class="value">${row.plan_summary || '-'}</div>
+      </div>
+    `;
+  }
+
+  function renderHistory(rows) {
+    if (!rows.length) return;
+    document.getElementById('history').style.display = 'block';
+    document.getElementById('historyList').innerHTML = rows
+      .map((r) => {
+        const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+        return `<div class="history-item">
+          <span>${t}</span>
+          <span>$${r.price_snapshot}</span>
+          <span class="badge badge-${r.bias}" style="padding:2px 10px; font-size:11px">${r.bias}</span>
+        </div>`;
+      })
+      .join('');
+  }
+
+  loadData();
+  setInterval(loadData, 5 * 60 * 1000); // รีเฟรชทุก 5 นาที
+</script>
+</body>
+</html>
