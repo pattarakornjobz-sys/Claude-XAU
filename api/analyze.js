@@ -2,10 +2,10 @@
 // Vercel Serverless Function: ดึงราคา XAUUSD -> วิเคราะห์ด้วย Claude -> เก็บ Supabase -> แจ้งเตือน LINE
 //
 // ENV VARS ที่ต้องตั้งใน Vercel Project Settings:
-//   TWELVEDATA_API_KEY   = key จาก twelvedata.com
+//   TWELVEDATA_API_KEY   = d6f320883cdb4aa9ba996c601445364a
 //   ANTHROPIC_API_KEY    = key จาก console.anthropic.com
-//   SUPABASE_URL         = https://xxxx.supabase.co
-//   SUPABASE_SERVICE_KEY = service_role key (ไม่ใช่ anon key เพราะต้อง insert)
+//   SUPABASE_URL         = https://uhefxwccuqagnbrbidbh.supabase.co
+//   SUPABASE_SERVICE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjAwMjU0NiwiZXhwIjoyMTAxNTc4NTQ2fQ.IXqz87BVcOXVTTwSwAb8CpCL8ATm4DjPMi1wTePQAkM
 //   LINE_CHANNEL_TOKEN   = Channel access token ของ LINE Official Account (Messaging API)
 //   LINE_USER_ID         = userId หรือ groupId ปลายทางที่จะรับข้อความ (วิธีหาไว้ใน README)
 //   CRON_SECRET          = string สุ่มไว้กันคนอื่นยิง endpoint นี้เล่น
