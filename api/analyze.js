@@ -3,7 +3,7 @@
 //
 // ENV VARS ที่ต้องตั้งใน Vercel Project Settings:
 //   TWELVEDATA_API_KEY   = d6f320883cdb4aa9ba996c601445364a
-//   ANTHROPIC_API_KEY    = key จาก console.anthropic.com
+//   ANTHROPIC_API_KEY    = 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
 //   SUPABASE_URL         = https://uhefxwccuqagnbrbidbh.supabase.co
 //   SUPABASE_SERVICE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjAwMjU0NiwiZXhwIjoyMTAxNTc4NTQ2fQ.IXqz87BVcOXVTTwSwAb8CpCL8ATm4DjPMi1wTePQAkM
 //   LINE_CHANNEL_TOKEN   = Channel access token ของ LINE Official Account (Messaging API)
