@@ -1,0 +1,9 @@
+{
+  "name": "claude-xau",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XAUUSD analysis agent — ดึงราคาทองคำ วิเคราะห์ด้วย Claude แจ้งเตือนผ่าน Telegram เมื่อมีสัญญาณใหม่",
+  "engines": {
+    "node": ">=18"
+  }
+}

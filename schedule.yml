@@ -1,0 +1,25 @@
+name: Trigger XAUUSD analysis
+
+on:
+  schedule:
+    # รันทุกชั่วโมง ตั้งแต่ 00:00-15:00 UTC = 07:00-22:00 น. เวลาไทย (UTC+7)
+    # หมายเหตุ: GitHub Actions cron อาจดีเลย์ได้บ้าง (ไม่การันตีความแม่นยำระดับนาที)
+    - cron: '0 0-15 * * *'
+  workflow_dispatch: {} # กดรันเองได้จากแท็บ Actions เพื่อทดสอบ
+
+jobs:
+  call-analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/analyze endpoint
+        run: |
+          response=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ANALYZE_URL }}")
+          echo "HTTP status: $response"
+          cat /tmp/response.json
+          if [ "$response" -ge 400 ]; then
+            echo "Request failed with status $response"
+            exit 1
+          fi
