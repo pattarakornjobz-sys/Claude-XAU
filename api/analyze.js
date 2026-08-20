@@ -1,6 +1,6 @@
 // api/analyze.js
 // Vercel Serverless Function: ดึงราคา XAUUSD หลาย timeframe (4H/1H/15M) -> คำนวณ indicator เอง (RSI/MACD/EMA)
-// -> วิเคราะห์โครงสร้าง+SMC+แผนเทรดด้วย Claude -> เก็บลง Supabase -> แจ้งเตือน Telegram (เฉพาะตอนมีสัญญาณใหม่)
+// -> วิเคราะห์โครงสร้าง+SMC+แผนเทรดด้วย Claude -> เก็บลง Supabase -> แจ้งเตือน Telegram (ส่งทุกครั้งที่รัน)
 //
 // สำคัญ: ค่าทั้งหมดด้านล่างต้องตั้งเป็น Environment Variable บน Vercel เท่านั้น
 // ห้ามเขียนค่าจริงลงในไฟล์นี้หรือใส่ไว้ในคอมเมนต์เด็ดขาด (เคยมีปัญหา key หลุดมาก่อน)
@@ -16,6 +16,10 @@
 //
 // หมายเหตุขอบเขต: ระบบนี้เป็นเครื่องมือ "วิเคราะห์แล้วแจ้งเตือน" เท่านั้น ไม่เชื่อมต่อบัญชีเทรดจริง
 // ไม่มีการส่งคำสั่งซื้อขายหรือปิดออเดอร์ใดๆ ทั้งสิ้น
+
+// ลิงก์หน้า dashboard ที่แนบไปกับข้อความแจ้งเตือน Telegram ทุกครั้ง
+// (ถ้าอยากเปลี่ยนโดเมนในอนาคต ไปตั้ง Environment Variable DASHBOARD_URL ใน Vercel ได้เลย ไม่ต้องแก้โค้ด)
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://claude-xau.vercel.app/';
 
 const SYMBOL = 'XAU/USD';
 const CANDLE_COUNT = 220; // เผื่อคำนวณ EMA200 ได้แม่นยำขึ้น
@@ -54,13 +58,12 @@ module.exports = async function handler(req, res) {
     const previous = await getLastAnalysis();
     await saveToSupabase(candlesByTf, indicatorsByTf, analysis);
 
+    // แจ้งเตือนทุกครั้งที่วิเคราะห์เสร็จ (ไม่กรองเฉพาะตอนสัญญาณเปลี่ยนแล้ว)
     const isNewSignal =
       analysis.bias && analysis.bias !== 'Wait' && analysis.bias !== (previous && previous.bias);
-    if (isNewSignal) {
-      await notifyTelegram(analysis, previous);
-    }
+    await notifyTelegram(analysis, previous, isNewSignal);
 
-    return res.status(200).json({ ok: true, bias: analysis.bias, notified: !!isNewSignal });
+    return res.status(200).json({ ok: true, bias: analysis.bias, notified: true });
   } catch (err) {
     console.error('analyze.js error:', err);
     return res.status(500).json({ ok: false, error: String(err && err.message ? err.message : err) });
@@ -376,7 +379,7 @@ async function testTelegram() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: '🧪 ทดสอบการแจ้งเตือน XAUUSD Analysis\n\nถ้าคุณเห็นข้อความนี้ แปลว่าเชื่อมต่อ Telegram Bot สำเร็จแล้ว ระบบจริงจะส่งข้อความแบบนี้ก็ต่อเมื่อสัญญาณเปลี่ยน (เช่น Wait → Long) เท่านั้น ไม่ส่งทุกรอบที่วิเคราะห์',
+        text: '🧪 ทดสอบการแจ้งเตือน XAUUSD Analysis\n\nถ้าคุณเห็นข้อความนี้ แปลว่าเชื่อมต่อ Telegram Bot สำเร็จแล้ว ระบบจริงจะส่งสรุปผลวิเคราะห์แบบนี้ให้ทุกครั้งที่รัน (ทุกรอบตามตารางเวลา)',
       }),
     });
     const data = await r.json();
@@ -387,8 +390,8 @@ async function testTelegram() {
   }
 }
 
-// ---------- 6) แจ้งเตือนผ่าน Telegram (เฉพาะตอนมีสัญญาณใหม่) ----------
-async function notifyTelegram(analysis, previous) {
+// ---------- 6) แจ้งเตือนผ่าน Telegram (ส่งทุกครั้งที่วิเคราะห์เสร็จ) ----------
+async function notifyTelegram(analysis, previous, isNewSignal) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
@@ -405,9 +408,12 @@ async function notifyTelegram(analysis, previous) {
   };
   const ti = analysis.trade_idea || {};
 
+  const headline = isNewSignal
+    ? `🥇 XAUUSD — พบสัญญาณใหม่\nเปลี่ยนจาก: ${prevBiasText} → ${analysis.bias}`
+    : `🥇 XAUUSD — อัปเดตผลวิเคราะห์ (สัญญาณเดิม: ${analysis.bias})`;
+
   const msg =
-    `🥇 XAUUSD — พบสัญญาณใหม่\n` +
-    `เปลี่ยนจาก: ${prevBiasText} → ${analysis.bias}` +
+    headline +
     (analysis.confidence_score != null ? ` (Confidence ${analysis.confidence_score}%)` : '') +
     `\n\n` +
     `ราคา: ${analysis.price}\n\n` +
@@ -417,12 +423,13 @@ async function notifyTelegram(analysis, previous) {
     `\nEntry: ${ti.entry_zone || '-'} | SL: ${ti.stop_loss || '-'} | TP: ${(ti.take_profit || []).join(', ') || '-'} | R:R ${ti.rr_ratio || '-'}\n\n` +
     `แผน: ${analysis.plan_summary}\n` +
     `ข้อควรระวัง: ${analysis.confidence_note || '-'}\n\n` +
+    `🔗 ดูกราฟ + รายละเอียดเต็มที่ dashboard: ${DASHBOARD_URL}\n\n` +
     `⚠️ นี่คือการสรุปโครงสร้างราคาโดย AI เพื่อประกอบการตัดสินใจเท่านั้น ไม่ใช่คำแนะนำการลงทุน`;
 
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: msg.slice(0, 4000) }),
+    body: JSON.stringify({ chat_id: chatId, text: msg.slice(0, 4000), disable_web_page_preview: false }),
   });
 
   if (!r.ok) {
