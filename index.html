@@ -179,7 +179,8 @@
     <div class="item"><div class="lbl">Lot Size (มาตรฐาน)</div><div class="val" id="calcLot">-</div></div>
     <div class="item"><div class="lbl">ระยะ SL</div><div class="val" id="calcDistance">-</div></div>
   </div>
-  <div class="calc-note">คำนวณจากสมมติฐานทองคำ 1 lot มาตรฐาน = 100 ออนซ์ (การเคลื่อนไหว $1 = $100 ต่อ 1 lot) ค่าจริงอาจแตกต่างกันตามโบรกเกอร์ของคุณ — เป็นเครื่องมือคำนวณฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมต่อบัญชีเทรดใดๆ</div>
+  <div class="calc-note" id="calcWarning" style="display:none; color:var(--warning)"></div>
+  <div class="calc-note">คำนวณจากสมมติฐานทองคำ 1 lot มาตรฐาน = 100 ออนซ์ (การเคลื่อนไหว $1 = $100 ต่อ 1 lot, 0.01 lot = 1 micro lot) ค่าจริงอาจแตกต่างกันตามโบรกเกอร์ของคุณ — เป็นเครื่องมือคำนวณฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมต่อบัญชีเทรดใดๆ</div>
 </div>
 
 <div id="history" class="card" style="display:none; margin-top:16px">
@@ -414,9 +415,11 @@
     const distanceEl = document.getElementById('calcDistance');
     const riskAmtEl = document.getElementById('calcRiskAmt');
     const lotEl = document.getElementById('calcLot');
+    const warnEl = document.getElementById('calcWarning');
 
     if (![balance, riskPct, entry, sl].every((v) => Number.isFinite(v)) || entry === sl) {
       distanceEl.textContent = '-'; riskAmtEl.textContent = '-'; lotEl.textContent = '-';
+      warnEl.style.display = 'none';
       return;
     }
     const distance = Math.abs(entry - sl);
@@ -425,7 +428,15 @@
 
     distanceEl.textContent = '$' + distance.toFixed(2);
     riskAmtEl.textContent = '$' + riskAmount.toFixed(2);
-    lotEl.textContent = lot.toFixed(2) + ' lot';
+    // lot เล็กมากได้ (เช่นทุนน้อย) ถ้าปัดแค่ 2 ตำแหน่งจะเห็นเป็น 0.00 เข้าใจผิดว่าคำนวณพัง เลยแสดงทศนิยมเพิ่มเมื่อค่าน้อยกว่า 0.01
+    lotEl.textContent = (lot > 0 && lot < 0.01 ? lot.toFixed(4) : lot.toFixed(2)) + ' lot';
+
+    if (lot > 0 && lot < 0.01) {
+      warnEl.style.display = 'block';
+      warnEl.textContent = `⚠️ ขนาดที่คำนวณได้ (${lot.toFixed(4)} lot) ต่ำกว่า 0.01 lot (micro lot) ซึ่งเป็นขนาดขั้นต่ำที่โบรกเกอร์ส่วนใหญ่กำหนด ด้วยทุนและความเสี่ยง% นี้อาจเปิดออเดอร์จริงไม่ได้ — ลองเพิ่มทุน เพิ่ม% ความเสี่ยงต่อไม้ หรือหา SL ที่ระยะสั้นลง`;
+    } else {
+      warnEl.style.display = 'none';
+    }
   }
 
   ['calcBalance', 'calcRisk', 'calcEntry', 'calcSl'].forEach((id) => {
