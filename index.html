@@ -114,25 +114,16 @@
   .calc-result .item .val{font-size:18px; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums}
   .calc-note{font-size:11px; color:var(--text-muted); margin-top:10px; line-height:1.5}
 
-  /* split rows (multi-TP lot calculator) */
-  .split-row{
-    display:grid; grid-template-columns:28px 1fr 90px 1fr 1fr 1fr; gap:10px; align-items:end;
-    padding:10px 0; border-bottom:1px solid var(--border);
-  }
+  /* split rows (multi-TP + multi-SL lot calculator) */
+  .split-row{padding:12px 0; border-bottom:1px solid var(--border)}
   .split-row:first-of-type{border-top:1px solid var(--border)}
-  @media (max-width:760px){
-    .split-row{grid-template-columns:1fr 1fr; grid-template-areas:"idx idx" "tp pct" "risk lot" "reward reward"}
-    .split-row .split-idx{grid-area:idx}
-    .split-row .split-tp{grid-area:tp}
-    .split-row .split-pct{grid-area:pct}
-    .split-row .split-risk{grid-area:risk}
-    .split-row .split-lot{grid-area:lot}
-    .split-row .split-reward{grid-area:reward}
-  }
-  .split-idx{color:var(--text-muted); font-size:12px; font-weight:700; padding-bottom:9px}
+  .split-idx{color:var(--text-muted); font-size:12px; font-weight:700; margin-bottom:8px}
+  .split-inputs{display:grid; grid-template-columns:1fr 1fr 1fr 90px; gap:8px}
+  @media (max-width:600px){ .split-inputs{grid-template-columns:1fr 1fr} }
   .split-row .field{margin-bottom:0}
   .split-row .field input{padding:7px 9px; font-size:13px}
-  .split-out{font-size:13px; font-variant-numeric:tabular-nums; padding-bottom:8px}
+  .split-outputs{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px}
+  .split-out{font-size:13px; font-variant-numeric:tabular-nums}
   .split-out .lbl{color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px}
   .split-out .val{color:var(--text-secondary); font-weight:600}
 
@@ -178,27 +169,20 @@
 
 <div class="card" style="margin-top:16px">
   <div class="section-label">คำนวณขนาดออเดอร์ (Lot Size Calculator)</div>
-  <div class="calc-grid">
+  <div class="calc-grid" style="grid-template-columns:1fr 1fr">
     <div class="field">
-      <label>ทุนในบัญชี (USD)</label>
+      <label>ทุนในบัญชี (USD) — ใช้แสดง % ความเสี่ยงต่อพอร์ตเท่านั้น</label>
       <input type="number" id="calcBalance" placeholder="เช่น 1000" min="0" />
     </div>
     <div class="field">
-      <label>ความเสี่ยงรวมทุกไม้ต่อครั้ง (%)</label>
-      <input type="number" id="calcRisk" placeholder="เช่น 1" value="1" min="0" step="0.1" />
-    </div>
-    <div class="field">
-      <label>ราคา Entry (ใช้ร่วมกันทุกไม้)</label>
-      <input type="number" id="calcEntry" placeholder="เช่น 4489" step="0.01" />
-    </div>
-    <div class="field">
-      <label>ราคา Stop Loss (ใช้ร่วมกันทุกไม้)</label>
-      <input type="number" id="calcSl" placeholder="เช่น 4460" step="0.01" />
+      <label>แบ่งเป็นกี่ไม้</label>
+      <input type="number" id="calcSplits" min="1" max="6" value="3" step="1" />
     </div>
   </div>
-  <div class="field" style="max-width:220px; margin-bottom:14px">
-    <label>แบ่งเป็นกี่ไม้ (scale-out หลาย TP)</label>
-    <input type="number" id="calcSplits" min="1" max="6" value="3" step="1" />
+
+  <div class="chart-tabs" id="calcModeTabs" style="margin-bottom:14px">
+    <button class="chart-tab" data-mode="risk">กำหนด % ความเสี่ยง → คำนวณ Lot</button>
+    <button class="chart-tab active" data-mode="lot">กำหนด Lot เอง → คำนวณความเสี่ยง/R:R</button>
   </div>
 
   <div id="calcSplitRows"></div>
@@ -207,9 +191,11 @@
     <div class="item"><div class="lbl">เสี่ยงรวมเป็นเงิน</div><div class="val" id="calcRiskAmt">-</div></div>
     <div class="item"><div class="lbl">Lot รวมทุกไม้</div><div class="val" id="calcLot">-</div></div>
     <div class="item"><div class="lbl">กำไรรวมถ้าชน TP ครบทุกไม้</div><div class="val" id="calcRewardTotal">-</div></div>
+    <div class="item"><div class="lbl">R:R รวม (ถ่วงน้ำหนัก)</div><div class="val" id="calcBlendedRR">-</div></div>
+    <div class="item"><div class="lbl">Entry เฉลี่ย (ถ่วงน้ำหนักด้วย Lot)</div><div class="val" id="calcAvgEntry">-</div></div>
   </div>
   <div class="calc-note" id="calcWarning" style="display:none; color:var(--warning)"></div>
-  <div class="calc-note">คำนวณจากสมมติฐานทองคำ 1 lot มาตรฐาน = 100 ออนซ์ (การเคลื่อนไหว $1 = $100 ต่อ 1 lot, 0.01 lot = 1 micro lot) ทุกไม้ใช้ Entry/Stop Loss เดียวกัน ต่างกันแค่จุด Take Profit และสัดส่วน % ความเสี่ยงที่แบ่งให้ — ค่าจริงอาจแตกต่างกันตามโบรกเกอร์ของคุณ เป็นเครื่องมือคำนวณฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมต่อบัญชีเทรดใดๆ</div>
+  <div class="calc-note">คำนวณจากสมมติฐานทองคำ 1 lot มาตรฐาน = 100 ออนซ์ (การเคลื่อนไหว $1 = $100 ต่อ 1 lot, 0.01 lot = 1 micro lot) แต่ละไม้กำหนด Entry / SL / TP ของตัวเองได้อิสระ (เหมาะกับการวางไม้แบบ scale-in หลายราคาในโซนเดียวกัน) — ค่าจริงอาจแตกต่างกันตามโบรกเกอร์ของคุณ เป็นเครื่องมือคำนวณฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมต่อบัญชีเทรดใดๆ</div>
 </div>
 
 <div id="history" class="card" style="display:none; margin-top:16px">
@@ -413,7 +399,7 @@
     chart.timeScale().fitContent();
   }
 
-  // ---------- Lot Size Calculator แบบแบ่งหลายไม้ (scale-out หลาย TP) — ฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมบัญชีเทรดใดๆ ----------
+  // ---------- Lot Size Calculator แบบหลายไม้ Entry/SL/TP อิสระต่อไม้ — ฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมบัญชีเทรดใดๆ ----------
   function parseFirstNumber(s) {
     if (s == null) return null;
     const m = String(s).match(/-?\d+(\.\d+)?/);
@@ -421,21 +407,21 @@
   }
 
   let lastTradeIdea = {};
+  let calcMode = 'lot'; // 'risk' = กำหนด % ความเสี่ยง -> คำนวณ lot | 'lot' = กำหนด lot เอง -> คำนวณความเสี่ยง/R:R
 
   function prefillCalculator(row) {
     lastTradeIdea = row.trade_idea_json || {};
-    const entryEl = document.getElementById('calcEntry');
-    const slEl = document.getElementById('calcSl');
-    if (!entryEl.value) {
-      const e = parseFirstNumber(lastTradeIdea.entry_zone) ?? row.price_snapshot;
-      if (e != null) entryEl.value = e;
-    }
-    if (!slEl.value) {
-      const s = parseFirstNumber(lastTradeIdea.stop_loss);
-      if (s != null) slEl.value = s;
-    }
     renderSplitRows();
   }
+
+  document.getElementById('calcModeTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.chart-tab');
+    if (!btn) return;
+    document.querySelectorAll('#calcModeTabs .chart-tab').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    calcMode = btn.dataset.mode;
+    renderSplitRows();
+  });
 
   function renderSplitRows() {
     let n = parseInt(document.getElementById('calcSplits').value, 10);
@@ -443,23 +429,39 @@
     if (n > 6) n = 6;
 
     const container = document.getElementById('calcSplitRows');
+    const existingEntries = Array.from(container.querySelectorAll('.split-entry input')).map((el) => el.value);
+    const existingSls = Array.from(container.querySelectorAll('.split-sl input')).map((el) => el.value);
     const existingTps = Array.from(container.querySelectorAll('.split-tp input')).map((el) => el.value);
-    const existingPcts = Array.from(container.querySelectorAll('.split-pct input')).map((el) => el.value);
+    const existingLast = Array.from(container.querySelectorAll('.split-last input')).map((el) => el.value);
+
+    const entryFromIdea = parseFirstNumber(lastTradeIdea.entry_zone);
     const tpFromIdea = Array.isArray(lastTradeIdea.take_profit) ? lastTradeIdea.take_profit : [];
+    const slFromIdea = parseFirstNumber(lastTradeIdea.stop_loss);
     const equalPct = Math.round((100 / n) * 100) / 100;
+
+    const lastLabel = calcMode === 'lot' ? 'Lot' : '% เสี่ยง';
+    const lastPlaceholder = calcMode === 'lot' ? '0.01' : '';
 
     let rows = '';
     for (let i = 0; i < n; i++) {
+      const entryVal = existingEntries[i] || entryFromIdea || '';
+      const slVal = existingSls[i] || slFromIdea || '';
       const tpVal = existingTps[i] || parseFirstNumber(tpFromIdea[i]) || '';
-      const pctVal = existingPcts[i] || (i === n - 1 ? (100 - equalPct * (n - 1)).toFixed(2) : equalPct);
+      const lastVal = existingLast[i] || (calcMode === 'lot' ? '0.01' : (i === n - 1 ? (100 - equalPct * (n - 1)).toFixed(2) : equalPct));
       rows += `
         <div class="split-row">
-          <div class="split-idx">TP${i + 1}</div>
-          <div class="field split-tp"><label>ราคา TP${i + 1}</label><input type="number" step="0.01" value="${tpVal}" /></div>
-          <div class="field split-pct"><label>% ความเสี่ยงที่แบ่ง</label><input type="number" step="0.1" min="0" max="100" value="${pctVal}" /></div>
-          <div class="split-out split-risk"><div class="lbl">เสี่ยงไม้นี้</div><div class="val">-</div></div>
-          <div class="split-out split-lot"><div class="lbl">Lot ไม้นี้</div><div class="val">-</div></div>
-          <div class="split-out split-reward"><div class="lbl">กำไรถ้าชน TP</div><div class="val">-</div></div>
+          <div class="split-idx">ไม้ที่ ${i + 1}</div>
+          <div class="split-inputs">
+            <div class="field split-entry"><label>Entry</label><input type="number" step="0.01" value="${entryVal}" /></div>
+            <div class="field split-sl"><label>SL</label><input type="number" step="0.01" value="${slVal}" /></div>
+            <div class="field split-tp"><label>TP</label><input type="number" step="0.01" value="${tpVal}" /></div>
+            <div class="field split-last"><label>${lastLabel}</label><input type="number" step="${calcMode === 'lot' ? '0.01' : '0.1'}" min="0" placeholder="${lastPlaceholder}" value="${lastVal}" /></div>
+          </div>
+          <div class="split-outputs">
+            <div class="split-out split-risk"><div class="lbl">เสี่ยงไม้นี้</div><div class="val">-</div></div>
+            <div class="split-out split-reward"><div class="lbl">กำไรถ้าชน TP</div><div class="val">-</div></div>
+            <div class="split-out split-rr"><div class="lbl">R:R ไม้นี้</div><div class="val">-</div></div>
+          </div>
         </div>
       `;
     }
@@ -470,78 +472,88 @@
 
   function runCalculator() {
     const balance = parseFloat(document.getElementById('calcBalance').value);
-    const riskPct = parseFloat(document.getElementById('calcRisk').value);
-    const entry = parseFloat(document.getElementById('calcEntry').value);
-    const sl = parseFloat(document.getElementById('calcSl').value);
 
     const riskAmtEl = document.getElementById('calcRiskAmt');
     const lotEl = document.getElementById('calcLot');
     const rewardEl = document.getElementById('calcRewardTotal');
+    const rrEl = document.getElementById('calcBlendedRR');
+    const avgEntryEl = document.getElementById('calcAvgEntry');
     const warnEl = document.getElementById('calcWarning');
     const rows = Array.from(document.querySelectorAll('#calcSplitRows .split-row'));
 
-    const clearRows = () => {
-      rows.forEach((row) => {
-        row.querySelectorAll('.split-out .val').forEach((el) => (el.textContent = '-'));
-      });
+    const clearOut = () => {
+      riskAmtEl.textContent = '-'; lotEl.textContent = '-'; rewardEl.textContent = '-';
+      rrEl.textContent = '-'; avgEntryEl.textContent = '-';
+      rows.forEach((row) => row.querySelectorAll('.split-out .val').forEach((el) => (el.textContent = '-')));
     };
 
-    if (![balance, riskPct, entry, sl].every((v) => Number.isFinite(v)) || entry === sl || !rows.length) {
-      riskAmtEl.textContent = '-'; lotEl.textContent = '-'; rewardEl.textContent = '-';
-      warnEl.style.display = 'none';
-      clearRows();
-      return;
-    }
+    if (!rows.length) { warnEl.style.display = 'none'; clearOut(); return; }
 
-    const distance = Math.abs(entry - sl);
-    const totalRiskAmount = balance * (riskPct / 100);
-    const direction = entry > sl ? 1 : -1; // 1 = Long (TP อยู่เหนือ entry), -1 = Short
-
-    let pctSum = 0;
-    let totalLot = 0;
-    let totalReward = 0;
-    let anyBelowMin = false;
+    let totalRisk = 0, totalReward = 0, totalLot = 0, weightedEntrySum = 0;
+    let anyBelowMin = false, anyIncomplete = false;
 
     rows.forEach((row) => {
-      const tpInput = row.querySelector('.split-tp input');
-      const pctInput = row.querySelector('.split-pct input');
-      const tp = parseFloat(tpInput.value);
-      const pct = parseFloat(pctInput.value);
+      const entry = parseFloat(row.querySelector('.split-entry input').value);
+      const sl = parseFloat(row.querySelector('.split-sl input').value);
+      const tp = parseFloat(row.querySelector('.split-tp input').value);
+      const lastInput = parseFloat(row.querySelector('.split-last input').value);
       const riskOut = row.querySelector('.split-risk .val');
-      const lotOut = row.querySelector('.split-lot .val');
       const rewardOut = row.querySelector('.split-reward .val');
+      const rrOut = row.querySelector('.split-rr .val');
 
-      if (!Number.isFinite(pct) || pct <= 0) {
-        riskOut.textContent = '-'; lotOut.textContent = '-'; rewardOut.textContent = '-';
+      if (![entry, sl].every((v) => Number.isFinite(v)) || entry === sl || !Number.isFinite(lastInput) || lastInput <= 0) {
+        riskOut.textContent = '-'; rewardOut.textContent = '-'; rrOut.textContent = '-';
+        anyIncomplete = true;
         return;
       }
-      pctSum += pct;
-      const rowRisk = totalRiskAmount * (pct / 100);
-      const rowLot = rowRisk / (distance * 100);
-      totalLot += rowLot;
+
+      const distance = Math.abs(entry - sl);
+      let lot, rowRisk;
+      if (calcMode === 'lot') {
+        lot = lastInput;
+        rowRisk = lot * 100 * distance; // 1 lot มาตรฐาน = 100 oz
+      } else {
+        rowRisk = balance * (lastInput / 100);
+        lot = Number.isFinite(balance) ? rowRisk / (distance * 100) : NaN;
+      }
+      if (!Number.isFinite(lot)) {
+        riskOut.textContent = '-'; rewardOut.textContent = '-'; rrOut.textContent = '-';
+        anyIncomplete = true;
+        return;
+      }
+
+      totalRisk += rowRisk;
+      totalLot += lot;
+      weightedEntrySum += entry * lot;
+      if (lot > 0 && lot < 0.01) anyBelowMin = true;
       riskOut.textContent = '$' + rowRisk.toFixed(2);
-      lotOut.textContent = (rowLot > 0 && rowLot < 0.01 ? rowLot.toFixed(4) : rowLot.toFixed(2)) + ' lot';
-      if (rowLot > 0 && rowLot < 0.01) anyBelowMin = true;
 
       if (Number.isFinite(tp) && tp !== entry) {
-        const rowReward = rowLot * 100 * Math.abs(tp - entry);
+        const rowReward = lot * 100 * Math.abs(tp - entry);
         totalReward += rowReward;
         rewardOut.textContent = '$' + rowReward.toFixed(2);
+        rrOut.textContent = '1:' + (rowReward / rowRisk).toFixed(2);
       } else {
         rewardOut.textContent = '-';
+        rrOut.textContent = '-';
       }
     });
 
-    riskAmtEl.textContent = '$' + totalRiskAmount.toFixed(2);
-    lotEl.textContent = (totalLot > 0 && totalLot < 0.01 ? totalLot.toFixed(4) : totalLot.toFixed(2)) + ' lot';
+    riskAmtEl.textContent = totalRisk > 0 ? '$' + totalRisk.toFixed(2) : '-';
+    lotEl.textContent = totalLot > 0 ? (totalLot < 0.01 ? totalLot.toFixed(4) : totalLot.toFixed(2)) + ' lot' : '-';
     rewardEl.textContent = totalReward > 0 ? '$' + totalReward.toFixed(2) : '-';
+    rrEl.textContent = totalRisk > 0 && totalReward > 0 ? '1:' + (totalReward / totalRisk).toFixed(2) : '-';
+    avgEntryEl.textContent = totalLot > 0 ? '$' + (weightedEntrySum / totalLot).toFixed(2) : '-';
 
     const warnings = [];
-    if (Math.abs(pctSum - 100) > 0.5) {
-      warnings.push(`⚠️ สัดส่วน % ความเสี่ยงรวมตอนนี้ = ${pctSum.toFixed(1)}% (ควรรวมให้ครบ 100% พอดี)`);
+    if (calcMode === 'risk' && !Number.isFinite(balance)) {
+      warnings.push('⚠️ ต้องกรอก "ทุนในบัญชี" ก่อน ถึงจะคำนวณจาก % ความเสี่ยงได้');
+    }
+    if (anyIncomplete) {
+      warnings.push('⚠️ บางไม้ยังกรอกไม่ครบ (Entry / SL ต้องไม่เท่ากัน และต้องกรอก ' + (calcMode === 'lot' ? 'Lot' : '% เสี่ยง') + ' ด้วย)');
     }
     if (anyBelowMin) {
-      warnings.push(`⚠️ บางไม้คำนวณได้ต่ำกว่า 0.01 lot (micro lot) ซึ่งเป็นขนาดขั้นต่ำที่โบรกเกอร์ส่วนใหญ่กำหนด อาจเปิดออเดอร์จริงไม่ได้ — ลองเพิ่มทุน ลดจำนวนไม้ที่แบ่ง หรือเพิ่ม% ความเสี่ยง`);
+      warnings.push('⚠️ บางไม้คำนวณได้ต่ำกว่า 0.01 lot (micro lot) ซึ่งเป็นขนาดขั้นต่ำที่โบรกเกอร์ส่วนใหญ่กำหนด');
     }
     if (warnings.length) {
       warnEl.style.display = 'block';
@@ -551,9 +563,7 @@
     }
   }
 
-  ['calcBalance', 'calcRisk', 'calcEntry', 'calcSl'].forEach((id) => {
-    document.getElementById(id).addEventListener('input', runCalculator);
-  });
+  document.getElementById('calcBalance').addEventListener('input', runCalculator);
   document.getElementById('calcSplits').addEventListener('input', renderSplitRows);
 
   function renderHistory(rows) {
