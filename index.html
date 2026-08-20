@@ -76,6 +76,12 @@
   }
   .chart-tab.active{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
   #chart{width:100%; height:320px; border-radius:8px; overflow:hidden}
+  .chart-legend{
+    display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:10px; padding-top:10px;
+    border-top:1px solid var(--border); font-size:11px; color:var(--text-muted);
+  }
+  .chart-legend span{display:flex; align-items:center; gap:5px}
+  .chart-legend i{display:inline-block; width:9px; height:9px; border-radius:2px; flex-shrink:0}
 
   /* trade idea */
   .trade-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
@@ -97,6 +103,9 @@
   .tf-levels{display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px; margin-bottom:12px}
   .tf-levels .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px}
   .tf-levels .val{color:var(--text-secondary); line-height:1.6}
+  .level-confluence-3{color:var(--gold); font-weight:800}
+  .level-confluence-2{color:var(--gold); font-weight:400}
+  .tf-confluence-note{font-size:11px; color:var(--text-muted); margin-bottom:12px}
   .tf-gauge{border-top:1px solid var(--border); padding-top:10px; font-size:11.5px; color:var(--text-muted); line-height:1.9}
   .tf-gauge b{color:var(--text-secondary); font-weight:600}
   .tag-good{color:var(--good); font-weight:600}
@@ -174,10 +183,21 @@
     <button class="chart-tab" data-tf="15m">15M</button>
   </div>
   <div id="chart"></div>
+  <div class="chart-legend" id="chartLegend">
+    <span><i style="background:#0ca30c"></i> HH / HL (โครงสร้างขาขึ้น)</span>
+    <span><i style="background:#d03b3b"></i> LH / LL (โครงสร้างขาลง)</span>
+    <span><i style="background:#0ca30c;opacity:.5"></i> เส้นประเขียว = แนวรับ (S)</span>
+    <span><i style="background:#d03b3b;opacity:.5"></i> เส้นประแดง = แนวต้าน (R)</span>
+    <span><i style="background:var(--gold)"></i> เส้นทอง = แนวโน้ม (Trendline)</span>
+  </div>
 </div>
 
 <div id="tfSection" style="display:none">
-  <div class="section-label" style="margin:4px 0 10px">รายละเอียดแต่ละ Timeframe</div>
+  <div class="section-label" style="margin:4px 0 4px">รายละเอียดแต่ละ Timeframe</div>
+  <div class="tf-confluence-note">
+    <span class="level-confluence-3">ตัวหนาสีทอง</span> = แนวรับ/แนวต้านตรงกันทั้ง 3 timeframe ·
+    <span class="level-confluence-2">สีทองปกติ</span> = ตรงกัน 2 timeframe
+  </div>
   <div class="tf-grid" id="tfGrid"></div>
 </div>
 
@@ -329,6 +349,38 @@
     `;
   }
 
+  // ---------- หาแนวรับ/แนวต้านที่ "ตรงกัน" ข้าม timeframe (confluence) เพื่อไฮไลต์ให้เด่น ----------
+  function clusterLevels(levelsWithTf, tolerance) {
+    const sorted = [...levelsWithTf].sort((a, b) => a.price - b.price);
+    const clusters = [];
+    sorted.forEach((item) => {
+      let cluster = clusters.find((c) => Math.abs(c.avg - item.price) <= tolerance);
+      if (!cluster) { cluster = { avg: item.price, items: [] }; clusters.push(cluster); }
+      cluster.items.push(item);
+      cluster.avg = cluster.items.reduce((s, i) => s + i.price, 0) / cluster.items.length;
+    });
+    return clusters.map((c) => ({ avg: c.avg, tfCount: new Set(c.items.map((i) => i.tf)).size }));
+  }
+
+  function confluenceClass(price, clusters, tolerance) {
+    if (!Number.isFinite(price)) return '';
+    const c = clusters.find((cl) => Math.abs(cl.avg - price) <= tolerance);
+    if (!c) return '';
+    if (c.tfCount >= 3) return 'level-confluence-3';
+    if (c.tfCount === 2) return 'level-confluence-2';
+    return '';
+  }
+
+  function renderLevelList(levels, clusters, tolerance) {
+    const arr = levels || [];
+    if (!arr.length) return '-';
+    return arr.map((lvl) => {
+      const price = parseFloat(lvl);
+      const cls = confluenceClass(price, clusters, tolerance);
+      return cls ? `<span class="${cls}">${esc(lvl)}</span>` : esc(lvl);
+    }).join(', ');
+  }
+
   function renderTimeframes(row) {
     const tfs = row.timeframes_json;
     const inds = row.indicators_json || {};
@@ -338,6 +390,26 @@
       return;
     }
     document.getElementById('tfSection').style.display = 'block';
+
+    // รวมแนวรับ/แนวต้านจากทั้ง 3 timeframe เข้าด้วยกัน แล้วจัดกลุ่มที่ราคาใกล้เคียงกัน (tolerance ตามราคาปัจจุบัน)
+    const priceRef = parseFloat(row.price_snapshot) || 4500;
+    const tolerance = Math.max(1.5, priceRef * 0.0007);
+    const allSupport = [], allResistance = [];
+    ['4h', '1h', '15m'].forEach((key) => {
+      const d = tfs[key];
+      if (!d) return;
+      (d.support_levels || []).forEach((lvl) => {
+        const price = parseFloat(lvl);
+        if (Number.isFinite(price)) allSupport.push({ tf: key, price });
+      });
+      (d.resistance_levels || []).forEach((lvl) => {
+        const price = parseFloat(lvl);
+        if (Number.isFinite(price)) allResistance.push({ tf: key, price });
+      });
+    });
+    const supportClusters = clusterLevels(allSupport, tolerance);
+    const resistanceClusters = clusterLevels(allResistance, tolerance);
+
     grid.innerHTML = ['4h', '1h', '15m'].map((key) => {
       const d = tfs[key];
       if (!d) return '';
@@ -353,11 +425,11 @@
           <div class="tf-levels">
             <div>
               <div class="lbl">แนวรับ</div>
-              <div class="val">${esc((d.support_levels || []).join(', ')) || '-'}</div>
+              <div class="val">${renderLevelList(d.support_levels, supportClusters, tolerance)}</div>
             </div>
             <div>
               <div class="lbl">แนวต้าน</div>
-              <div class="val">${esc((d.resistance_levels || []).join(', ')) || '-'}</div>
+              <div class="val">${renderLevelList(d.resistance_levels, resistanceClusters, tolerance)}</div>
             </div>
           </div>
           ${gaugeLine(inds[key])}
@@ -411,6 +483,106 @@
       .sort((a, b) => a.time - b.time);
     series.setData(data);
     chart.timeScale().fitContent();
+    renderStructureOverlay(data);
+  }
+
+  // ---------- วิเคราะห์โครงสร้างราคาบนกราฟ: จุดสวิง HH/HL/LH/LL + แนวรับ-แนวต้าน + เส้นแนวโน้ม ----------
+  // คำนวณจากราคาจริง (raw_candles) ล้วนๆ ฝั่งหน้าเว็บ ไม่พึ่ง AI ตรงนี้ เพื่อให้ตัวเลขตรงกับกราฟเป๊ะๆ
+  function detectSwingPoints(data, bars) {
+    const points = [];
+    for (let i = bars; i < data.length - bars; i++) {
+      const c = data[i];
+      let isHigh = true, isLow = true;
+      for (let j = i - bars; j <= i + bars; j++) {
+        if (j === i) continue;
+        if (data[j].high >= c.high) isHigh = false;
+        if (data[j].low <= c.low) isLow = false;
+      }
+      if (isHigh) points.push({ time: c.time, price: c.high, kind: 'high' });
+      if (isLow) points.push({ time: c.time, price: c.low, kind: 'low' });
+    }
+    points.sort((a, b) => a.time - b.time);
+
+    let prevHigh = null, prevLow = null;
+    return points.map((p) => {
+      let label;
+      if (p.kind === 'high') {
+        label = prevHigh == null ? 'H' : (p.price > prevHigh ? 'HH' : 'LH');
+        prevHigh = p.price;
+      } else {
+        label = prevLow == null ? 'L' : (p.price > prevLow ? 'HL' : 'LL');
+        prevLow = p.price;
+      }
+      return { ...p, label };
+    });
+  }
+
+  let trendLineSeries = [];
+  let activePriceLines = [];
+
+  function renderStructureOverlay(data) {
+    if (!chart || !series) return;
+    if (data.length < 12) {
+      series.setMarkers([]);
+      trendLineSeries.forEach((s) => chart.removeSeries(s));
+      trendLineSeries = [];
+      activePriceLines.forEach((pl) => series.removePriceLine(pl));
+      activePriceLines = [];
+      return;
+    }
+    const bars = data.length > 120 ? 4 : 2;
+    const swings = detectSwingPoints(data, bars);
+    const recent = swings.slice(-12); // เอาแค่จุดล่าสุด ไม่ให้กราฟรกเกินไป
+
+    // จุดสวิง HH/HL/LH/LL
+    const markers = recent.map((p) => ({
+      time: p.time,
+      position: p.kind === 'high' ? 'aboveBar' : 'belowBar',
+      color: (p.label === 'HH' || p.label === 'HL') ? '#0ca30c' : (p.label === 'LH' || p.label === 'LL') ? '#d03b3b' : '#c3c2b7',
+      shape: p.kind === 'high' ? 'arrowDown' : 'arrowUp',
+      text: `${p.label} ${p.price.toFixed(2)}`,
+    }));
+    series.setMarkers(markers);
+
+    // เส้นแนวโน้ม: ลากผ่านจุดต่ำสุด 2 จุดล่าสุด (แนวรับที่เอียง) และจุดสูงสุด 2 จุดล่าสุด (แนวต้านที่เอียง)
+    trendLineSeries.forEach((s) => chart.removeSeries(s));
+    trendLineSeries = [];
+    const lastLows = recent.filter((p) => p.kind === 'low').slice(-2);
+    const lastHighs = recent.filter((p) => p.kind === 'high').slice(-2);
+    [lastLows, lastHighs].forEach((pair) => {
+      if (pair.length === 2 && pair[0].time !== pair[1].time) {
+        const ln = chart.addLineSeries({
+          color: 'rgba(212,175,55,.7)', lineWidth: 2,
+          lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+        });
+        ln.setData(pair.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time));
+        trendLineSeries.push(ln);
+      }
+    });
+
+    // แนวรับ/แนวต้านจาก AI (timeframes_json) — ตีเป็นเส้นราคาแนวนอนบนกราฟ
+    activePriceLines.forEach((pl) => series.removePriceLine(pl));
+    activePriceLines = [];
+    const tfs = (latestRow && latestRow.timeframes_json) || {};
+    const d = tfs[activeTf];
+    if (d) {
+      (d.support_levels || []).slice(0, 3).forEach((lvl) => {
+        const price = parseFloat(lvl);
+        if (!Number.isFinite(price)) return;
+        activePriceLines.push(series.createPriceLine({
+          price, color: '#0ca30c', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: true, title: 'S',
+        }));
+      });
+      (d.resistance_levels || []).slice(0, 3).forEach((lvl) => {
+        const price = parseFloat(lvl);
+        if (!Number.isFinite(price)) return;
+        activePriceLines.push(series.createPriceLine({
+          price, color: '#d03b3b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: true, title: 'R',
+        }));
+      });
+    }
   }
 
   // ---------- Lot Size Calculator แบบหลายไม้ Entry/SL/TP อิสระต่อไม้ — ฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมบัญชีเทรดใดๆ ----------
