@@ -32,6 +32,7 @@
   .price-row{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap}
   .price{font-size:34px; font-weight:600; color:var(--gold); line-height:1.1}
   .updated{color:var(--text-muted); font-size:12px; margin-top:5px}
+  .badge-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end}
 
   .badge{
     display:inline-flex; align-items:center; gap:6px; padding:5px 13px; border-radius:999px;
@@ -42,6 +43,11 @@
   .badge-Short{color:var(--critical); background:rgba(208,59,59,.12); border-color:rgba(208,59,59,.35)}
   .badge-Wait{color:var(--warning); background:rgba(250,178,25,.12); border-color:rgba(250,178,25,.35)}
   .badge-sm{font-size:11px; padding:3px 9px}
+  .conf-badge{
+    display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px;
+    font-size:12px; font-weight:600; color:var(--text-secondary); background:rgba(255,255,255,.06);
+    border:1px solid var(--border);
+  }
 
   .section-label{
     color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;
@@ -59,6 +65,14 @@
   .chart-tab.active{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
   #chart{width:100%; height:320px; border-radius:8px; overflow:hidden}
 
+  /* trade idea */
+  .trade-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  @media (max-width:640px){ .trade-grid{grid-template-columns:1fr 1fr} }
+  .trade-stat{background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; padding:12px}
+  .trade-stat .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:5px}
+  .trade-stat .val{font-size:14px; font-weight:600; color:var(--text-primary); font-variant-numeric:tabular-nums}
+  .trade-note{font-size:11.5px; color:var(--text-muted); margin-top:12px; line-height:1.5}
+
   /* timeframe cards grid */
   .tf-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
   @media (max-width:760px){ .tf-grid{grid-template-columns:1fr} }
@@ -66,13 +80,39 @@
   .tf-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
   .tf-name{font-size:14px; font-weight:700; color:var(--text-primary)}
   .tf-trend{font-size:12px; color:var(--text-muted); margin-bottom:10px}
-  .tf-note{font-size:12.5px; line-height:1.6; color:var(--text-secondary); margin-bottom:12px; min-height:38px}
-  .tf-levels{display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px}
+  .tf-note{font-size:12.5px; line-height:1.6; color:var(--text-secondary); margin-bottom:10px}
+  .tf-smc{font-size:12px; line-height:1.6; color:var(--text-muted); margin-bottom:12px; padding-left:8px; border-left:2px solid var(--border)}
+  .tf-levels{display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px; margin-bottom:12px}
   .tf-levels .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px}
   .tf-levels .val{color:var(--text-secondary); line-height:1.6}
+  .tf-gauge{border-top:1px solid var(--border); padding-top:10px; font-size:11.5px; color:var(--text-muted); line-height:1.9}
+  .tf-gauge b{color:var(--text-secondary); font-weight:600}
+  .tag-good{color:var(--good); font-weight:600}
+  .tag-warning{color:var(--warning); font-weight:600}
+  .tag-critical{color:var(--critical); font-weight:600}
+  .tag-neutral{color:var(--text-secondary); font-weight:600}
 
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px}
   @media (max-width:560px){ .grid2{grid-template-columns:1fr} }
+
+  /* lot size calculator */
+  .calc-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px}
+  @media (max-width:560px){ .calc-grid{grid-template-columns:1fr} }
+  .field{display:flex; flex-direction:column; gap:5px}
+  .field label{font-size:11.5px; color:var(--text-muted)}
+  .field input{
+    background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--text-primary);
+    border-radius:8px; padding:9px 11px; font-size:14px; font-family:inherit; font-variant-numeric:tabular-nums;
+  }
+  .field input:focus{outline:none; border-color:rgba(212,175,55,.6)}
+  .calc-result{
+    display:flex; gap:12px; flex-wrap:wrap; background:rgba(212,175,55,.07);
+    border:1px solid rgba(212,175,55,.3); border-radius:10px; padding:14px;
+  }
+  .calc-result .item{flex:1; min-width:120px}
+  .calc-result .item .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px}
+  .calc-result .item .val{font-size:18px; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums}
+  .calc-note{font-size:11px; color:var(--text-muted); margin-top:10px; line-height:1.5}
 
   .history-item{
     padding:11px 0; border-bottom:1px solid var(--border); font-size:13px;
@@ -89,9 +129,15 @@
 
 <h1>🥇 XAUUSD Analysis</h1>
 <div class="sub">อัปเดตอัตโนมัติทุก 4 ชั่วโมง · จันทร์–ศุกร์ 07:00–23:00 น. · Multi-timeframe 4H / 1H / 15M</div>
-<div class="disclaimer">⚠️ ข้อมูลนี้เป็นการสรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เองเท่านั้น ไม่ใช่คำแนะนำการลงทุน และไม่รับประกันผลลัพธ์ใดๆ โปรดใช้วิจารณญาณและบริหารความเสี่ยงด้วยตนเอง</div>
+<div class="disclaimer">⚠️ ข้อมูลนี้เป็นการสรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เองเท่านั้น ไม่ใช่คำแนะนำการลงทุน ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ ทั้งสิ้น และไม่รับประกันผลลัพธ์ใดๆ โปรดใช้วิจารณญาณและบริหารความเสี่ยงด้วยตนเอง</div>
 
 <div id="latest" class="card loading">กำลังโหลด...</div>
+
+<div id="tradeCard" class="card" style="display:none">
+  <div class="section-label">แนวคิดแผนเทรด (ไม่ใช่คำสั่งซื้อขาย)</div>
+  <div class="trade-grid" id="tradeGrid"></div>
+  <div class="trade-note">ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง</div>
+</div>
 
 <div id="chartCard" class="card" style="display:none">
   <div class="section-label">กราฟราคา</div>
@@ -106,6 +152,34 @@
 <div id="tfSection" style="display:none">
   <div class="section-label" style="margin:4px 0 10px">รายละเอียดแต่ละ Timeframe</div>
   <div class="tf-grid" id="tfGrid"></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="section-label">คำนวณขนาดออเดอร์ (Lot Size Calculator)</div>
+  <div class="calc-grid">
+    <div class="field">
+      <label>ทุนในบัญชี (USD)</label>
+      <input type="number" id="calcBalance" placeholder="เช่น 1000" min="0" />
+    </div>
+    <div class="field">
+      <label>ความเสี่ยงที่รับได้ต่อไม้ (%)</label>
+      <input type="number" id="calcRisk" placeholder="เช่น 1" value="1" min="0" step="0.1" />
+    </div>
+    <div class="field">
+      <label>ราคา Entry</label>
+      <input type="number" id="calcEntry" placeholder="เช่น 4489" step="0.01" />
+    </div>
+    <div class="field">
+      <label>ราคา Stop Loss</label>
+      <input type="number" id="calcSl" placeholder="เช่น 4460" step="0.01" />
+    </div>
+  </div>
+  <div class="calc-result">
+    <div class="item"><div class="lbl">เสี่ยงเป็นเงิน</div><div class="val" id="calcRiskAmt">-</div></div>
+    <div class="item"><div class="lbl">Lot Size (มาตรฐาน)</div><div class="val" id="calcLot">-</div></div>
+    <div class="item"><div class="lbl">ระยะ SL</div><div class="val" id="calcDistance">-</div></div>
+  </div>
+  <div class="calc-note">คำนวณจากสมมติฐานทองคำ 1 lot มาตรฐาน = 100 ออนซ์ (การเคลื่อนไหว $1 = $100 ต่อ 1 lot) ค่าจริงอาจแตกต่างกันตามโบรกเกอร์ของคุณ — เป็นเครื่องมือคำนวณฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมต่อบัญชีเทรดใดๆ</div>
 </div>
 
 <div id="history" class="card" style="display:none; margin-top:16px">
@@ -137,8 +211,10 @@
       }
       latestRow = rows[0];
       renderLatest(latestRow);
+      renderTradeIdea(latestRow);
       renderChartCard(latestRow);
       renderTimeframes(latestRow);
+      prefillCalculator(latestRow);
       renderHistory(rows.slice(1));
     } catch (e) {
       document.getElementById('latest').className = 'card error';
@@ -156,6 +232,10 @@
     return `<span class="badge badge-${cls}${small ? ' badge-sm' : ''}">${esc(bias || 'Wait')}</span>`;
   }
 
+  function tag(text, kind) {
+    return `<span class="tag-${kind}">${esc(text)}</span>`;
+  }
+
   function renderLatest(row) {
     const t = new Date(row.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
     document.getElementById('latest').className = 'card';
@@ -165,7 +245,10 @@
           <div class="price">$${esc(row.price_snapshot)}</div>
           <div class="updated">อัปเดตล่าสุด ${esc(t)}</div>
         </div>
-        ${badge(row.bias)}
+        <div class="badge-row">
+          ${row.confidence_score != null ? `<span class="conf-badge">Confidence ${esc(row.confidence_score)}%</span>` : ''}
+          ${badge(row.bias)}
+        </div>
       </div>
       <div class="grid2">
         <div>
@@ -185,8 +268,40 @@
     `;
   }
 
+  function renderTradeIdea(row) {
+    const ti = row.trade_idea_json;
+    const card = document.getElementById('tradeCard');
+    if (!ti || typeof ti !== 'object') { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
+    document.getElementById('tradeGrid').innerHTML = `
+      <div class="trade-stat"><div class="lbl">Entry Zone</div><div class="val">${esc(ti.entry_zone) || '-'}</div></div>
+      <div class="trade-stat"><div class="lbl">Stop Loss</div><div class="val">${esc(ti.stop_loss) || '-'}</div></div>
+      <div class="trade-stat"><div class="lbl">Take Profit</div><div class="val">${esc(tp.join(' / ')) || '-'}</div></div>
+      <div class="trade-stat"><div class="lbl">R:R</div><div class="val">${esc(ti.rr_ratio) || '-'}</div></div>
+    `;
+  }
+
+  function gaugeLine(ind) {
+    if (!ind) return '<div class="tf-gauge">ยังไม่มีข้อมูล indicator</div>';
+    const rsiKind = ind.rsiStatus === 'Overbought' ? 'critical' : ind.rsiStatus === 'Oversold' ? 'good' : 'neutral';
+    const macdKind = ind.macdStatus === 'Bullish' ? 'good' : ind.macdStatus === 'Bearish' ? 'critical' : 'neutral';
+    const emaParts = [];
+    if (ind.ema20 != null) emaParts.push(`EMA20 ${ind.ema20}`);
+    if (ind.ema50 != null) emaParts.push(`EMA50 ${ind.ema50}`);
+    if (ind.ema200 != null) emaParts.push(`EMA200 ${ind.ema200}`);
+    return `
+      <div class="tf-gauge">
+        <div><b>RSI14</b> ${ind.rsi14 != null ? esc(ind.rsi14) : '-'} · ${tag(ind.rsiStatus || 'Neutral', rsiKind)}</div>
+        <div><b>MACD</b> ${tag(ind.macdStatus || 'Neutral', macdKind)}${ind.macd ? ` (hist ${esc(ind.macd.histogram)})` : ''}</div>
+        <div><b>EMA</b> ${esc(emaParts.join(' / ')) || '-'}</div>
+      </div>
+    `;
+  }
+
   function renderTimeframes(row) {
     const tfs = row.timeframes_json;
+    const inds = row.indicators_json || {};
     const grid = document.getElementById('tfGrid');
     if (!tfs || typeof tfs !== 'object') {
       document.getElementById('tfSection').style.display = 'none';
@@ -204,6 +319,7 @@
           </div>
           <div class="tf-trend">เทรนด์: ${esc(d.trend) || '-'}</div>
           <div class="tf-note">${esc(d.structure_note) || '-'}</div>
+          ${d.smc_zones ? `<div class="tf-smc">SMC: ${esc(d.smc_zones)}</div>` : ''}
           <div class="tf-levels">
             <div>
               <div class="lbl">แนวรับ</div>
@@ -214,6 +330,7 @@
               <div class="val">${esc((d.resistance_levels || []).join(', ')) || '-'}</div>
             </div>
           </div>
+          ${gaugeLine(inds[key])}
         </div>
       `;
     }).join('');
@@ -265,6 +382,55 @@
     series.setData(data);
     chart.timeScale().fitContent();
   }
+
+  // ---------- Lot Size Calculator (ฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมบัญชีเทรดใดๆ) ----------
+  function parseFirstNumber(s) {
+    if (s == null) return null;
+    const m = String(s).match(/-?\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+
+  function prefillCalculator(row) {
+    const ti = row.trade_idea_json || {};
+    const entryEl = document.getElementById('calcEntry');
+    const slEl = document.getElementById('calcSl');
+    if (!entryEl.value) {
+      const e = parseFirstNumber(ti.entry_zone) ?? row.price_snapshot;
+      if (e != null) entryEl.value = e;
+    }
+    if (!slEl.value) {
+      const s = parseFirstNumber(ti.stop_loss);
+      if (s != null) slEl.value = s;
+    }
+    runCalculator();
+  }
+
+  function runCalculator() {
+    const balance = parseFloat(document.getElementById('calcBalance').value);
+    const riskPct = parseFloat(document.getElementById('calcRisk').value);
+    const entry = parseFloat(document.getElementById('calcEntry').value);
+    const sl = parseFloat(document.getElementById('calcSl').value);
+
+    const distanceEl = document.getElementById('calcDistance');
+    const riskAmtEl = document.getElementById('calcRiskAmt');
+    const lotEl = document.getElementById('calcLot');
+
+    if (![balance, riskPct, entry, sl].every((v) => Number.isFinite(v)) || entry === sl) {
+      distanceEl.textContent = '-'; riskAmtEl.textContent = '-'; lotEl.textContent = '-';
+      return;
+    }
+    const distance = Math.abs(entry - sl);
+    const riskAmount = balance * (riskPct / 100);
+    const lot = riskAmount / (distance * 100); // 1 lot มาตรฐาน = 100 oz
+
+    distanceEl.textContent = '$' + distance.toFixed(2);
+    riskAmtEl.textContent = '$' + riskAmount.toFixed(2);
+    lotEl.textContent = lot.toFixed(2) + ' lot';
+  }
+
+  ['calcBalance', 'calcRisk', 'calcEntry', 'calcSl'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', runCalculator);
+  });
 
   function renderHistory(rows) {
     if (!rows.length) return;
