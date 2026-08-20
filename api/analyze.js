@@ -38,6 +38,13 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
+  // โหมดทดสอบ Telegram อย่างเดียว — ไม่เรียก TwelveData/Claude ให้เสียเครดิต แค่เช็คว่า token/chat_id เชื่อมได้จริง
+  // เรียกผ่าน: GET /api/analyze?secret=...&test_telegram=1
+  if (req.query && req.query.test_telegram === '1') {
+    const result = await testTelegram();
+    return res.status(result.ok ? 200 : 500).json(result);
+  }
+
   try {
     const candlesByTf = await fetchAllTimeframes();
     const indicatorsByTf = {};
@@ -189,6 +196,8 @@ const SYSTEM_PROMPT = `คุณเป็นผู้ช่วยสรุปโ
 
 วิเคราะห์แยกแต่ละ timeframe ก่อน (โครงสร้าง BOS/CHoCH, โซน SMC เช่น Fair Value Gap / Order Block / Liquidity Sweep, แนวรับ-แนวต้าน) แล้วสรุปภาพรวม (confluence) ว่าควรโฟกัสฝั่งไหน พร้อมประเมิน Confidence Score และแนวคิดแผนเทรด (entry zone / stop loss / take profit / R:R) แบบกว้างๆ เพื่อประกอบการตัดสินใจ — ไม่ใช่คำสั่งซื้อขายเด็ดขาด
 
+สำคัญมาก: ทุก field ที่เป็นข้อความต้องกระชับที่สุด — "structure_note" และ "smc_zones" ของแต่ละ timeframe ห้ามเกิน 1 ประโยคสั้นๆ (ไม่เกิน ~25 คำ), "overall_structure_note" และ "plan_summary" ห้ามเกิน 2 ประโยคสั้นๆ, "confidence_note" ห้ามเกิน 1 ประโยค ห้ามใส่รายละเอียดราคาซ้ำกับ support/resistance levels ที่มีอยู่แล้ว เพราะคำตอบต้องจบเป็น JSON ที่สมบูรณ์เสมอ ห้ามถูกตัดกลางคัน
+
 ตอบกลับเป็น JSON ล้วนๆ เท่านั้น (ไม่มีข้อความอื่นนอก JSON ไม่มี markdown code fence) ตามโครงสร้างนี้เป๊ะๆ:
 {
   "overall_bias": "Long หรือ Short หรือ Wait",
@@ -266,6 +275,10 @@ async function analyzeWithClaude(candlesByTf, indicatorsByTf) {
 
   const textBlock = (data.content || []).find((b) => b.type === 'text');
   if (!textBlock) throw new Error('Claude API ไม่ส่ง text กลับมา: ' + JSON.stringify(data));
+
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error('คำตอบจาก Claude ถูกตัดกลางคันเพราะยาวเกิน max_tokens — ลองเพิ่ม max_tokens หรือให้ตอบสั้นลง');
+  }
 
   let parsed;
   try {
@@ -350,7 +363,31 @@ async function saveToSupabase(candlesByTf, indicatorsByTf, analysis) {
   }
 }
 
-// ---------- 5) แจ้งเตือนผ่าน Telegram (เฉพาะตอนมีสัญญาณใหม่) ----------
+// ---------- 5) ทดสอบการเชื่อมต่อ Telegram อย่างเดียว (ไม่ผ่านการวิเคราะห์จริง) ----------
+async function testTelegram() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    return { ok: false, error: 'ยังไม่ได้ตั้งค่า TELEGRAM_BOT_TOKEN หรือ TELEGRAM_CHAT_ID ใน Vercel Environment Variables' };
+  }
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: '🧪 ทดสอบการแจ้งเตือน XAUUSD Analysis\n\nถ้าคุณเห็นข้อความนี้ แปลว่าเชื่อมต่อ Telegram Bot สำเร็จแล้ว ระบบจริงจะส่งข้อความแบบนี้ก็ต่อเมื่อสัญญาณเปลี่ยน (เช่น Wait → Long) เท่านั้น ไม่ส่งทุกรอบที่วิเคราะห์',
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) return { ok: false, error: 'Telegram API error', telegram_response: data };
+    return { ok: true, message: 'ส่งข้อความทดสอบสำเร็จ เช็คแชทกับบอทของคุณได้เลย', telegram_response: data };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
+}
+
+// ---------- 6) แจ้งเตือนผ่าน Telegram (เฉพาะตอนมีสัญญาณใหม่) ----------
 async function notifyTelegram(analysis, previous) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
