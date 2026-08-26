@@ -171,8 +171,12 @@
 
 <div id="tradeCard" class="card" style="display:none">
   <div class="section-label">แนวคิดแผนเทรด (ไม่ใช่คำสั่งซื้อขาย)</div>
+  <div class="chart-tabs" id="tradeModeTabs">
+    <button class="chart-tab active" data-mode="swing">ระยะยาว (Swing 4H/1H)</button>
+    <button class="chart-tab" data-mode="short">ระยะสั้น (Intraday 15M)</button>
+  </div>
   <div class="trade-grid" id="tradeGrid"></div>
-  <div class="trade-note">ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง</div>
+  <div class="trade-note" id="tradeNote">ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง</div>
 </div>
 
 <div id="chartCard" class="card" style="display:none">
@@ -318,18 +322,41 @@
     `;
   }
 
+  let tradeMode = 'swing'; // 'swing' = ระยะยาว 4H/1H | 'short' = ระยะสั้น 15M
+
+  document.getElementById('tradeModeTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.chart-tab');
+    if (!btn) return;
+    document.querySelectorAll('#tradeModeTabs .chart-tab').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    tradeMode = btn.dataset.mode;
+    if (latestRow) renderTradeIdea(latestRow);
+  });
+
   function renderTradeIdea(row) {
-    const ti = row.trade_idea_json;
+    const swing = row.trade_idea_json;
+    const short = row.trade_idea_short_json;
     const card = document.getElementById('tradeCard');
-    if (!ti || typeof ti !== 'object') { card.style.display = 'none'; return; }
+    const hasSwing = swing && typeof swing === 'object' && swing.entry_zone && swing.entry_zone !== '-';
+    const hasShort = short && typeof short === 'object' && short.entry_zone && short.entry_zone !== '-';
+    if (!hasSwing && !hasShort) { card.style.display = 'none'; return; }
     card.style.display = 'block';
+
+    const ti = (tradeMode === 'short' ? short : swing) || {};
+    const isShort = tradeMode === 'short';
     const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
-    document.getElementById('tradeGrid').innerHTML = `
+    const hasThisPlan = ti.entry_zone && ti.entry_zone !== '-';
+
+    document.getElementById('tradeGrid').innerHTML = hasThisPlan ? `
       <div class="trade-stat"><div class="lbl">Entry Zone</div><div class="val">${esc(ti.entry_zone) || '-'}</div></div>
       <div class="trade-stat"><div class="lbl">Stop Loss</div><div class="val">${esc(ti.stop_loss) || '-'}</div></div>
       <div class="trade-stat"><div class="lbl">Take Profit</div><div class="val">${esc(tp.join(' / ')) || '-'}</div></div>
       <div class="trade-stat"><div class="lbl">R:R</div><div class="val">${esc(ti.rr_ratio) || '-'}</div></div>
-    `;
+    ` : `<div class="trade-note" style="margin-top:0">โครงสร้าง ${isShort ? '15M' : '4H/1H'} ตอนนี้ยังไม่ชัดเจนพอให้เสนอแผน${isShort ? 'ระยะสั้น' : 'ระยะยาว'} ลองดูอีกแผนแทน หรือรอรอบวิเคราะห์ถัดไป</div>`;
+
+    document.getElementById('tradeNote').textContent = isShort
+      ? (ti.note || 'แผนระยะสั้นอิงโครงสร้าง 15M เท่านั้น SL แคบกว่าแผนระยะยาว จึงมีโอกาสโดน noise สะบัดออกบ่อยกว่า ควรบริหารความเสี่ยงให้เหมาะสม ไม่ใช่คำสั่งที่ต้องทำตาม')
+      : 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาระยะยาว (4H/1H) เท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง';
   }
 
   function gaugeLine(ind) {
