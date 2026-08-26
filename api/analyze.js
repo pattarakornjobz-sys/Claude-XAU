@@ -197,7 +197,9 @@ function computeIndicators(candles) {
 const SYSTEM_PROMPT = `คุณเป็นผู้ช่วยสรุปโครงสร้างราคาทางเทคนิคัลสำหรับ XAUUSD (ทองคำ) เท่านั้น แนว Smart Money Concepts (SMC) และ Price Action
 คุณจะได้รับ (1) ข้อมูลแท่งเทียนล่าสุดของ 3 timeframe: 4H, 1H, 15M และ (2) ค่า indicator ที่คำนวณแม่นยำแล้ว (RSI14, MACD, EMA20/50/200) ของแต่ละ timeframe — ใช้ตัวเลข indicator ที่ให้มาตรงๆ ห้ามคำนวณเอง
 
-วิเคราะห์แยกแต่ละ timeframe ก่อน (โครงสร้าง BOS/CHoCH, โซน SMC เช่น Fair Value Gap / Order Block / Liquidity Sweep, แนวรับ-แนวต้าน) แล้วสรุปภาพรวม (confluence) ว่าควรโฟกัสฝั่งไหน พร้อมประเมิน Confidence Score และแนวคิดแผนเทรด (entry zone / stop loss / take profit / R:R) แบบกว้างๆ เพื่อประกอบการตัดสินใจ — ไม่ใช่คำสั่งซื้อขายเด็ดขาด
+วิเคราะห์แยกแต่ละ timeframe ก่อน (โครงสร้าง BOS/CHoCH, โซน SMC เช่น Fair Value Gap / Order Block / Liquidity Sweep, แนวรับ-แนวต้าน) แล้วสรุปภาพรวม (confluence) ว่าควรโฟกัสฝั่งไหน พร้อมประเมิน Confidence Score และแนวคิดแผนเทรด 2 ระยะเพื่อประกอบการตัดสินใจ — ไม่ใช่คำสั่งซื้อขายเด็ดขาด:
+- "trade_idea" = แผนระยะยาว (Swing) อิงโครงสร้าง 4H/1H เป็นหลัก SL กว้างกว่าเพราะถือข้ามวัน/หลายวัน
+- "trade_idea_short" = แผนระยะสั้น (Intraday) อิงโครงสร้าง 15M เป็นหลัก SL แคบกว่าเพราะเข้าไม้สั้นจบในวัน ถ้า bias ของ 15m เป็น Wait หรือโครงสร้างยังไม่ชัดเจนพอ ให้ใส่ '-' ทุกช่องได้
 
 สำคัญมาก: ทุก field ที่เป็นข้อความต้องกระชับที่สุด — "structure_note" และ "smc_zones" ของแต่ละ timeframe ห้ามเกิน 1 ประโยคสั้นๆ (ไม่เกิน ~25 คำ), "overall_structure_note" และ "plan_summary" ห้ามเกิน 2 ประโยคสั้นๆ, "confidence_note" ห้ามเกิน 1 ประโยค ห้ามใส่รายละเอียดราคาซ้ำกับ support/resistance levels ที่มีอยู่แล้ว เพราะคำตอบต้องจบเป็น JSON ที่สมบูรณ์เสมอ ห้ามถูกตัดกลางคัน
 
@@ -209,10 +211,17 @@ const SYSTEM_PROMPT = `คุณเป็นผู้ช่วยสรุปโ
   "confidence_note": "ข้อควรระวัง หรือเงื่อนไขที่จะทำให้มุมมองนี้เปลี่ยนไป",
   "confidence_score": 0,
   "trade_idea": {
-    "entry_zone": "ช่วงราคาที่น่าสนใจถ้ามีโครงสร้างสนับสนุน เช่น '4478-4487' ถ้า bias เป็น Wait ให้ใส่ '-'",
-    "stop_loss": "ราคา SL แบบกว้างๆ ตามโครงสร้าง หรือ '-'",
+    "entry_zone": "ช่วงราคาที่น่าสนใจถ้ามีโครงสร้างสนับสนุน อิงโครงสร้างใหญ่ (4H/1H) เช่น '4478-4487' ถ้า bias เป็น Wait ให้ใส่ '-'",
+    "stop_loss": "ราคา SL แบบกว้างๆ ตามโครงสร้างใหญ่ (4H/1H) เผื่อ noise/liquidity sweep ปกติของทองคำ เหมาะกับถือข้ามวัน/หลายวัน หรือ '-'",
     "take_profit": ["TP1", "TP2", "TP3"],
     "rr_ratio": "เช่น '1:2.3' หรือ '-'"
+  },
+  "trade_idea_short": {
+    "entry_zone": "ช่วงราคาสำหรับเข้าไม้ระยะสั้น อิงโครงสร้าง 15M เท่านั้น (เช่น FVG/Order Block เล็กๆ หรือแนวรับ-แนวต้านของ 15M) เช่น '4489-4494' ถ้าโครงสร้าง 15M ยังไม่ชัดเจนพอให้ใส่ '-'",
+    "stop_loss": "ราคา SL แบบแคบ เลยจุด swing สูง/ต่ำล่าสุดของ 15M ไปไม่กี่ดอลลาร์ (ต่างจาก trade_idea ที่เป็น SL กว้างของ 4H/1H) เหมาะเทรดจบในวัน หรือ '-'",
+    "take_profit": ["TP1", "TP2"],
+    "rr_ratio": "เช่น '1:1.5' หรือ '-'",
+    "note": "อธิบายสั้นๆ 1 ประโยคว่าทำไมความเสี่ยงต่างจากแผนระยะยาว เช่น SL แคบกว่าจึงมีโอกาสโดน noise สะบัดออกบ่อยกว่า"
   },
   "timeframes": {
     "4h": { "trend": "Bullish หรือ Bearish หรือ Sideway", "bias": "Long หรือ Short หรือ Wait", "structure_note": "อธิบายโครงสร้างสั้นๆ เช่น BOS/CHoCH", "smc_zones": "อธิบายโซน FVG / Order Block / Liquidity Sweep ที่น่าสนใจของ timeframe นี้ หรือ 'ไม่มีโซนเด่นชัด'", "support_levels": ["ราคาแนวรับ เรียงใกล้ไปไกล"], "resistance_levels": ["ราคาแนวต้าน เรียงใกล้ไปไกล"] },
@@ -267,7 +276,7 @@ async function analyzeWithClaude(candlesByTf, indicatorsByTf) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 4500,
+      max_tokens: 5500,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userContent }],
     }),
@@ -305,6 +314,7 @@ async function analyzeWithClaude(candlesByTf, indicatorsByTf) {
     confidence_note: parsed.confidence_note,
     confidence_score: Number.isFinite(parsed.confidence_score) ? parsed.confidence_score : null,
     trade_idea: parsed.trade_idea || {},
+    trade_idea_short: parsed.trade_idea_short || {},
     timeframes: parsed.timeframes || {},
   };
 }
@@ -355,6 +365,7 @@ async function saveToSupabase(candlesByTf, indicatorsByTf, analysis) {
       full_analysis: analysis.full_text,
       timeframes_json: analysis.timeframes,
       trade_idea_json: analysis.trade_idea,
+      trade_idea_short_json: analysis.trade_idea_short,
       indicators_json: indicatorsByTf,
       raw_candles: candlesByTf,
     }),
@@ -407,6 +418,8 @@ async function notifyTelegram(analysis, previous, isNewSignal) {
     return `${label}: ${t.trend || '-'} / ${t.bias || '-'}\n`;
   };
   const ti = analysis.trade_idea || {};
+  const tiShort = analysis.trade_idea_short || {};
+  const hasShortPlan = tiShort.entry_zone && tiShort.entry_zone !== '-';
 
   const headline = isNewSignal
     ? `🥇 XAUUSD — พบสัญญาณใหม่\nเปลี่ยนจาก: ${prevBiasText} → ${analysis.bias}`
@@ -420,8 +433,13 @@ async function notifyTelegram(analysis, previous, isNewSignal) {
     tfLine('4H', '4h') +
     tfLine('1H', '1h') +
     tfLine('15M', '15m') +
-    `\nEntry: ${ti.entry_zone || '-'} | SL: ${ti.stop_loss || '-'} | TP: ${(ti.take_profit || []).join(', ') || '-'} | R:R ${ti.rr_ratio || '-'}\n\n` +
-    `แผน: ${analysis.plan_summary}\n` +
+    `\n📈 แผนระยะยาว (Swing 4H/1H)\n` +
+    `Entry: ${ti.entry_zone || '-'} | SL: ${ti.stop_loss || '-'} | TP: ${(ti.take_profit || []).join(', ') || '-'} | R:R ${ti.rr_ratio || '-'}\n` +
+    (hasShortPlan
+      ? `\n⚡ แผนระยะสั้น (Intraday 15M)\n` +
+        `Entry: ${tiShort.entry_zone || '-'} | SL: ${tiShort.stop_loss || '-'} | TP: ${(tiShort.take_profit || []).join(', ') || '-'} | R:R ${tiShort.rr_ratio || '-'}\n`
+      : '') +
+    `\nแผน: ${analysis.plan_summary}\n` +
     `ข้อควรระวัง: ${analysis.confidence_note || '-'}\n\n` +
     `🔗 ดูกราฟ + รายละเอียดเต็มที่ dashboard: ${DASHBOARD_URL}\n\n` +
     `⚠️ นี่คือการสรุปโครงสร้างราคาโดย AI เพื่อประกอบการตัดสินใจเท่านั้น ไม่ใช่คำแนะนำการลงทุน`;
