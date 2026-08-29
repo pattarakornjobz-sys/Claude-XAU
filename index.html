@@ -2,862 +2,588 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>XAUUSD Analysis Dashboard</title>
-
-<!-- PWA: ทำให้ "เพิ่มลงหน้าจอโฮม" แล้วเปิดเหมือนแอปได้ (ไม่มีแถบที่อยู่เบราว์เซอร์) -->
-<link rel="manifest" href="/manifest.json" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>XAUUSD Analysis</title>
+<link rel="manifest" href="./manifest.json" />
 <meta name="theme-color" content="#0d0d0d" />
-<link rel="icon" href="/icons/icon-192.png" type="image/png" />
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<link rel="icon" href="./icons/icon-192.png" type="image/png" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="XAUUSD" />
-
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root{
-    --page:#0d0d0d; --surface:#1a1a19; --border:rgba(255,255,255,.10);
-    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
-    --gridline:#2c2c2a; --baseline:#383835;
-    --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
-    --gold:#d4af37;
+    --page:#0d0d0d; --surface:#1a1a19; --border:rgba(255,255,255,.09);
+    --tp:#ffffff; --ts:#c3c2b7; --tm:#898781; --tf:#6d6b66;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --gold:#d4af37;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans Thai',system-ui,-apple-system,sans-serif;
   }
-  *{box-sizing:border-box}
-  html{overflow-x:hidden}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
   body{
-    margin:0; font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
-    background:var(--page); color:var(--text-primary); padding:20px 16px 60px;
-    max-width:980px; margin-left:auto; margin-right:auto; overflow-x:hidden;
+    margin:0; background:var(--page); color:var(--tp); font-family:var(--sans);
+    display:flex; flex-direction:column; overflow:hidden;
+    padding-top:env(safe-area-inset-top);
   }
-  h1{font-size:19px; font-weight:600; margin:0 0 4px; display:flex; align-items:center; gap:8px}
-  .sub{color:var(--text-muted); font-size:12.5px; margin-bottom:14px}
-  .disclaimer{
-    color:var(--text-secondary); font-size:11.5px; background:rgba(250,178,25,.07);
-    border:1px solid rgba(250,178,25,.35); border-radius:8px; padding:9px 12px; margin-bottom:20px; line-height:1.55;
-  }
-  .card{
-    background:var(--surface); border:1px solid var(--border); border-radius:14px;
-    padding:20px; margin-bottom:16px;
-  }
-  .price-row{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap}
-  .price{font-size:34px; font-weight:600; color:var(--gold); line-height:1.1}
-  .updated{color:var(--text-muted); font-size:12px; margin-top:5px}
-  .badge-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end}
+  a{color:var(--gold)} a:hover{color:#e8c869}
 
-  .badge{
-    display:inline-flex; align-items:center; gap:6px; padding:5px 13px; border-radius:999px;
-    font-size:13px; font-weight:600; border:1px solid transparent; white-space:nowrap;
+  header{
+    flex:none; padding:12px 18px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border); background:var(--page);
   }
-  .badge::before{content:''; width:7px; height:7px; border-radius:999px; background:currentColor}
-  .badge-Long{color:var(--good); background:rgba(12,163,12,.12); border-color:rgba(12,163,12,.35)}
-  .badge-Short{color:var(--critical); background:rgba(208,59,59,.12); border-color:rgba(208,59,59,.35)}
-  .badge-Wait{color:var(--warning); background:rgba(250,178,25,.12); border-color:rgba(250,178,25,.35)}
-  .badge-sm{font-size:11px; padding:3px 9px}
-  .conf-badge{
-    display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px;
-    font-size:12px; font-weight:600; color:var(--text-secondary); background:rgba(255,255,255,.06);
-    border:1px solid var(--border);
+  .brand{display:flex; flex-direction:column; gap:2px}
+  .brand b{font:700 16px var(--sans); letter-spacing:-.01em}
+  .brand span{font:400 10.5px var(--mono); color:var(--tm); letter-spacing:.04em}
+  .live{
+    display:flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px;
+    background:rgba(12,163,12,.12); border:1px solid rgba(12,163,12,.3);
+    font:600 10.5px var(--mono); color:var(--good); letter-spacing:.05em;
   }
+  .live i{width:6px;height:6px;border-radius:99px;background:var(--good);animation:pulse 2s infinite}
+  .live.stale{background:rgba(250,178,25,.12);border-color:rgba(250,178,25,.3);color:var(--warn)}
+  .live.stale i{background:var(--warn)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 
-  .section-label{
-    color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;
+  main{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 18px 26px}
+  .screen{display:none; flex-direction:column; gap:14px}
+  .screen.on{display:flex}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px}
+  .card.gold{background:linear-gradient(150deg,rgba(212,175,55,.13),rgba(26,26,25,.92) 55%); border-color:rgba(212,175,55,.28); border-radius:18px; padding:18px}
+  .lbl{font:400 10px var(--mono); color:var(--tm); letter-spacing:.1em}
+  .stack{display:flex; flex-direction:column; gap:8px}
+
+  .price-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px}
+  .price{font:600 34px var(--mono); color:var(--gold); line-height:1; letter-spacing:-.02em}
+  .updated{font:400 10.5px var(--mono); color:var(--tm); margin-top:6px}
+  .side{display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+  .badge{display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px; font:700 13px var(--sans); white-space:nowrap}
+  .badge.sm{font-size:11px; font-weight:600; padding:3px 10px}
+  .b-Long{color:var(--good); background:rgba(12,163,12,.14); border:1px solid rgba(12,163,12,.38)}
+  .b-Short{color:var(--crit); background:rgba(208,59,59,.14); border:1px solid rgba(208,59,59,.38)}
+  .b-Wait{color:var(--warn); background:rgba(250,178,25,.14); border:1px solid rgba(250,178,25,.38)}
+  .conf{
+    display:flex; flex-direction:column; align-items:center; gap:1px; padding:4px 10px; border-radius:10px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); white-space:nowrap;
   }
-  .body-text{font-size:14px; line-height:1.65; color:var(--text-secondary)}
-  .body-text.primary{color:var(--text-primary)}
+  .conf small{font:500 8.5px var(--mono); color:var(--tm); letter-spacing:.08em}
+  .conf b{font:600 12px var(--mono); color:var(--ts)}
+  .hr{height:1px; background:rgba(255,255,255,.09); margin:14px 0 12px}
+  .body{font:400 13px/1.65 var(--sans); color:var(--tp); text-wrap:pretty}
+  .body.dim{font-size:12.5px; color:var(--ts)}
 
-  /* chart */
-  .chart-tabs{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap}
-  .chart-tab{
-    background:transparent; border:1px solid var(--border); color:var(--text-secondary);
-    font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; cursor:pointer;
-    font-family:inherit; white-space:normal; text-align:center; flex:1 1 auto; min-width:0;
+  .lvl{display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 14px}
+  .lvl .l{display:flex; align-items:center; gap:10px}
+  .lvl .bar{width:3px; height:26px; border-radius:99px}
+  .lvl .p{font:600 14px var(--mono); letter-spacing:-.01em}
+  .lvl .k{font:400 10.5px var(--sans); color:var(--tm)}
+  .lvl .tf{font:600 10px var(--mono); letter-spacing:.06em; padding:4px 9px; border-radius:6px; color:var(--gold); background:rgba(212,175,55,.12); border:1px solid rgba(212,175,55,.3)}
+
+  .tfc{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px}
+  .tfc .h{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+  .tfc .n{font:700 14px var(--mono)}
+  .tfc .t{font:400 11.5px var(--sans); color:var(--tm); margin-bottom:7px}
+  .tfc .note{font:400 12.5px/1.6 var(--sans); color:var(--ts); text-wrap:pretty}
+  .tfc .smc{font:400 11.5px/1.6 var(--sans); color:var(--tm); margin-top:8px; padding-left:8px; border-left:2px solid var(--border)}
+  .tfc .lv{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:11px; font:400 11.5px/1.6 var(--mono); color:var(--ts)}
+  .tfc .lv .lbl{margin-bottom:3px}
+  .tfc .ind{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:11px; padding-top:10px; border-top:1px solid var(--border); font:400 11px var(--mono); color:var(--tm)}
+  .tfc .ind b{font-weight:600}
+  .c3{color:var(--gold); font-weight:700}
+  .c2{color:var(--gold); font-weight:400}
+  .g{color:var(--good)} .w{color:var(--warn)} .r{color:var(--crit)} .n{color:var(--ts)}
+
+  .tabs{display:flex; gap:6px}
+  .tabs button{
+    flex:1; background:transparent; border:1px solid rgba(255,255,255,.12); color:var(--ts);
+    font:600 12px var(--sans); padding:9px 4px; border-radius:9px; cursor:pointer; font-family:var(--sans);
   }
-  .chart-tab.active{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
-  #chart{width:100%; height:320px; border-radius:8px; overflow:hidden}
-  .chart-legend{
-    display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:10px; padding-top:10px;
-    border-top:1px solid var(--border); font-size:11px; color:var(--text-muted);
-  }
-  .chart-legend span{display:flex; align-items:center; gap:5px}
-  .chart-legend i{display:inline-block; width:9px; height:9px; border-radius:2px; flex-shrink:0}
+  .tabs.mono button{font-family:var(--mono); font-size:12.5px}
+  .tabs button.on{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
 
-  /* trade idea */
-  .trade-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
-  @media (max-width:640px){ .trade-grid{grid-template-columns:1fr 1fr} }
-  .trade-stat{background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; padding:12px}
-  .trade-stat .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:5px}
-  .trade-stat .val{font-size:14px; font-weight:600; color:var(--text-primary); font-variant-numeric:tabular-nums}
-  .trade-note{font-size:11.5px; color:var(--text-muted); margin-top:12px; line-height:1.5}
+  #chart{height:250px; border-radius:8px; overflow:hidden}
+  .legend{display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font:400 10px var(--sans); color:var(--tm)}
+  .legend span{display:flex; align-items:center; gap:5px}
+  .legend i{width:9px; height:9px; border-radius:2px; display:inline-block; flex:none}
+  .legend i.dash{width:12px; height:0; border-top:1px dashed}
 
-  /* timeframe cards grid */
-  .tf-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
-  @media (max-width:760px){ .tf-grid{grid-template-columns:1fr} }
-  .tf-card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px}
-  .tf-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
-  .tf-name{font-size:14px; font-weight:700; color:var(--text-primary)}
-  .tf-trend{font-size:12px; color:var(--text-muted); margin-bottom:10px}
-  .tf-note{font-size:12.5px; line-height:1.6; color:var(--text-secondary); margin-bottom:10px}
-  .tf-smc{font-size:12px; line-height:1.6; color:var(--text-muted); margin-bottom:12px; padding-left:8px; border-left:2px solid var(--border)}
-  .tf-levels{display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px; margin-bottom:12px}
-  .tf-levels .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px}
-  .tf-levels .val{color:var(--text-secondary); line-height:1.6}
-  .level-confluence-3{color:var(--gold); font-weight:800}
-  .level-confluence-2{color:var(--gold); font-weight:400}
-  .tf-confluence-note{font-size:11px; color:var(--text-muted); margin-bottom:12px}
-  .tf-gauge{border-top:1px solid var(--border); padding-top:10px; font-size:11.5px; color:var(--text-muted); line-height:1.9}
-  .tf-gauge b{color:var(--text-secondary); font-weight:600}
-  .tag-good{color:var(--good); font-weight:600}
-  .tag-warning{color:var(--warning); font-weight:600}
-  .tag-critical{color:var(--critical); font-weight:600}
-  .tag-neutral{color:var(--text-secondary); font-weight:600}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+  .stat{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:11px; padding:11px 12px; display:flex; flex-direction:column; gap:4px}
+  .stat .k{font:400 9.5px var(--mono); color:var(--tm); letter-spacing:.08em}
+  .stat .v{font:600 13.5px var(--mono)}
 
-  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px}
-  @media (max-width:560px){ .grid2{grid-template-columns:1fr} }
-
-  /* lot size calculator */
-  .calc-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px}
-  @media (max-width:560px){ .calc-grid{grid-template-columns:1fr} }
-  .field{display:flex; flex-direction:column; gap:5px; min-width:0}
-  .field label{font-size:11.5px; color:var(--text-muted)}
+  .fields{display:grid; grid-template-columns:1fr 1fr; column-gap:10px; row-gap:16px}
+  .field{display:flex; flex-direction:column; gap:6px; min-width:0}
+  .field.wide{grid-column:1 / -1}
+  .field label{font:400 10.5px/1.6 var(--sans); color:var(--tm); white-space:nowrap}
   .field input{
-    background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--text-primary);
-    border-radius:8px; padding:9px 11px; font-size:14px; font-family:inherit; font-variant-numeric:tabular-nums;
-    width:100%; min-width:0; box-sizing:border-box;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); color:var(--tp);
+    border-radius:9px; padding:10px 11px; font:500 14px var(--mono); width:100%;
   }
   .field input:focus{outline:none; border-color:rgba(212,175,55,.6)}
-  .calc-result{
-    display:flex; gap:12px; flex-wrap:wrap; background:rgba(212,175,55,.07);
-    border:1px solid rgba(212,175,55,.3); border-radius:10px; padding:14px;
+  .out{
+    background:linear-gradient(150deg,rgba(212,175,55,.14),rgba(26,26,25,.92) 60%);
+    border:1px solid rgba(212,175,55,.3); border-radius:16px; padding:16px;
+    display:grid; grid-template-columns:1fr 1fr; gap:14px;
   }
-  .calc-result .item{flex:1; min-width:120px}
-  .calc-result .item .lbl{color:var(--text-muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px}
-  .calc-result .item .val{font-size:18px; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums}
-  .calc-note{font-size:11px; color:var(--text-muted); margin-top:10px; line-height:1.5}
+  .out div{display:flex; flex-direction:column; gap:4px; min-width:0}
+  .out .k{font:400 9.5px var(--mono); color:var(--tm); letter-spacing:.08em}
+  .out .v{font:700 19px var(--mono); color:var(--gold); letter-spacing:-.01em}
 
-  /* split rows (multi-TP + multi-SL lot calculator) */
-  .split-row{padding:12px 0; border-bottom:1px solid var(--border)}
-  .split-row:first-of-type{border-top:1px solid var(--border)}
-  .split-idx{color:var(--text-muted); font-size:12px; font-weight:700; margin-bottom:8px}
-  .split-inputs{display:grid; grid-template-columns:1fr 1fr 1fr 90px; gap:8px; min-width:0}
-  @media (max-width:600px){ .split-inputs{grid-template-columns:1fr 1fr; gap:10px 8px} }
-  .split-row .field{margin-bottom:0; min-width:0}
-  .split-row .field input{padding:7px 9px; font-size:13px}
-  .split-outputs{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; min-width:0}
-  @media (max-width:420px){ .split-outputs{grid-template-columns:1fr 1fr} }
-  .split-out{font-size:13px; font-variant-numeric:tabular-nums}
-  .split-out .lbl{color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px}
-  .split-out .val{color:var(--text-secondary); font-weight:600}
+  .hist{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); font:400 12.5px var(--sans); color:var(--tm)}
+  .hist:last-child{border-bottom:none}
+  .hist .p{font:500 12.5px var(--mono); color:var(--ts)}
 
-  .history-item{
-    padding:11px 0; border-bottom:1px solid var(--border); font-size:13px;
-    display:flex; justify-content:space-between; align-items:center; gap:12px; color:var(--text-muted);
+  .fine{font:400 10.5px/1.6 var(--sans); color:var(--tm); text-wrap:pretty}
+  .disc{font:400 10.5px/1.6 var(--sans); color:var(--tm); background:rgba(250,178,25,.06); border:1px solid rgba(250,178,25,.28); border-radius:10px; padding:10px 12px; text-wrap:pretty}
+  .state{padding:60px 0; text-align:center; font:400 13px/1.7 var(--sans); color:var(--tm)}
+  .state.err{color:var(--crit)}
+
+  nav{
+    flex:none; display:flex; border-top:1px solid var(--border); background:rgba(13,13,13,.97);
+    padding:9px 6px calc(10px + env(safe-area-inset-bottom));
   }
-  .history-item:last-child{border-bottom:none}
-  .history-item .h-price{color:var(--text-secondary); font-variant-numeric:tabular-nums}
-
-  .loading{color:var(--text-muted); text-align:center; padding:50px 0}
-  .error{color:var(--critical); text-align:center; padding:40px 0; font-size:13px; line-height:1.7}
+  nav button{
+    flex:1; background:transparent; border:none; cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; gap:5px; padding:5px 0; font-family:var(--sans);
+  }
+  nav i{width:16px; height:16px; border:2px solid var(--tf); background:transparent; display:block}
+  nav span{font:600 10px var(--sans); color:var(--tf)}
+  nav button.on i{border-color:var(--gold); background:rgba(212,175,55,.35)}
+  nav button.on span{color:var(--gold)}
+  nav button:nth-child(1) i{border-radius:4px}
+  nav button:nth-child(2) i{border-radius:2px}
+  nav button:nth-child(3) i{border-radius:50%}
+  nav button:nth-child(4) i{border-radius:4px}
 </style>
 </head>
 <body>
 
-<h1>🥇 XAUUSD Analysis</h1>
-<div class="sub">อัปเดตอัตโนมัติทุก 4 ชั่วโมง · จันทร์–ศุกร์ 07:00–23:00 น. · Multi-timeframe 4H / 1H / 15M</div>
-<div class="disclaimer">⚠️ ข้อมูลนี้เป็นการสรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เองเท่านั้น ไม่ใช่คำแนะนำการลงทุน ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ ทั้งสิ้น และไม่รับประกันผลลัพธ์ใดๆ โปรดใช้วิจารณญาณและบริหารความเสี่ยงด้วยตนเอง</div>
+<header>
+  <div class="brand"><b>XAUUSD</b><span>GOLD SPOT · 4H / 1H / 15M</span></div>
+  <div class="live" id="live"><i></i><span id="liveText">LOADING</span></div>
+</header>
 
-<div id="latest" class="card loading">กำลังโหลด...</div>
+<main>
+  <section class="screen on" id="s-overview">
+    <div class="state" id="ovState">กำลังโหลดข้อมูล...</div>
+    <div id="ovBody" class="stack" style="gap:14px; display:none"></div>
+  </section>
 
-<div id="tradeCard" class="card" style="display:none">
-  <div class="section-label">แนวคิดแผนเทรด (ไม่ใช่คำสั่งซื้อขาย)</div>
-  <div class="chart-tabs" id="tradeModeTabs">
-    <button class="chart-tab active" data-mode="swing">ระยะยาว (Swing 4H/1H)</button>
-    <button class="chart-tab" data-mode="short">ระยะสั้น (Intraday 1H)</button>
-  </div>
-  <div class="trade-grid" id="tradeGrid"></div>
-  <div class="trade-note" id="tradeNote">ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง</div>
-</div>
-
-<div id="chartCard" class="card" style="display:none">
-  <div class="section-label">กราฟราคา</div>
-  <div class="chart-tabs" id="chartTabs">
-    <button class="chart-tab" data-tf="4h">4H</button>
-    <button class="chart-tab active" data-tf="1h">1H</button>
-    <button class="chart-tab" data-tf="15m">15M</button>
-  </div>
-  <div id="chart"></div>
-  <div class="chart-legend" id="chartLegend">
-    <span><i style="background:#0ca30c"></i> HH / HL (โครงสร้างขาขึ้น)</span>
-    <span><i style="background:#d03b3b"></i> LH / LL (โครงสร้างขาลง)</span>
-    <span><i style="background:#0ca30c;opacity:.5"></i> เส้นประเขียว = แนวรับ (S)</span>
-    <span><i style="background:#d03b3b;opacity:.5"></i> เส้นประแดง = แนวต้าน (R)</span>
-    <span><i style="background:var(--gold)"></i> เส้นทอง = แนวโน้ม (Trendline)</span>
-    <span><i style="background:#0ca30c;border-radius:50%"></i> ▲ แพทเทิลสัญญาณ Long</span>
-    <span><i style="background:#d03b3b;border-radius:50%"></i> ▼ แพทเทิลสัญญาณ Short</span>
-    <span><i style="background:#fab219;border-radius:50%"></i> ● Doji (ไม่ชัดเจน)</span>
-  </div>
-</div>
-
-<div id="tfSection" style="display:none">
-  <div class="section-label" style="margin:4px 0 4px">รายละเอียดแต่ละ Timeframe</div>
-  <div class="tf-confluence-note">
-    <span class="level-confluence-3">ตัวหนาสีทอง</span> = แนวรับ/แนวต้านตรงกันทั้ง 3 timeframe ·
-    <span class="level-confluence-2">สีทองปกติ</span> = ตรงกัน 2 timeframe
-  </div>
-  <div class="tf-grid" id="tfGrid"></div>
-</div>
-
-<div class="card" style="margin-top:16px">
-  <div class="section-label">คำนวณขนาดออเดอร์ (Lot Size Calculator)</div>
-  <div class="calc-grid" style="grid-template-columns:1fr 1fr">
-    <div class="field">
-      <label>ทุนในบัญชี (USD) — ใช้แสดง % ความเสี่ยงต่อพอร์ตเท่านั้น</label>
-      <input type="number" id="calcBalance" placeholder="เช่น 1000" min="0" />
+  <section class="screen" id="s-chart">
+    <div class="tabs mono" id="chartTabs">
+      <button data-tf="4h">4H</button>
+      <button data-tf="1h" class="on">1H</button>
+      <button data-tf="15m">15M</button>
     </div>
-    <div class="field">
-      <label>แบ่งเป็นกี่ไม้</label>
-      <input type="number" id="calcSplits" min="1" max="6" value="3" step="1" />
+    <div class="card" style="padding:14px 12px 10px">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; padding:0 2px 10px">
+        <span style="font:600 12px var(--mono)" id="chartTitle">1H · CANDLES</span>
+        <span style="font:400 10.5px var(--mono); color:var(--tm)" id="chartRange">—</span>
+      </div>
+      <div id="chart"></div>
+      <div class="legend">
+        <span><i style="background:#0ca30c"></i>แท่งขึ้น</span>
+        <span><i style="background:#d03b3b"></i>แท่งลง</span>
+        <span><i class="dash" style="border-color:rgba(12,163,12,.8)"></i>แนวรับ</span>
+        <span><i class="dash" style="border-color:rgba(208,59,59,.8)"></i>แนวต้าน</span>
+      </div>
     </div>
-  </div>
+    <div class="stack">
+      <span class="lbl">แนวรับ / แนวต้าน ของ TIMEFRAME นี้</span>
+      <div class="grid2" id="chartLevels"></div>
+    </div>
+  </section>
 
-  <div class="chart-tabs" id="calcModeTabs" style="margin-bottom:14px">
-    <button class="chart-tab" data-mode="risk">กำหนด % เสี่ยง → หา Lot</button>
-    <button class="chart-tab active" data-mode="lot">กำหนด Lot → หา R:R</button>
-  </div>
+  <section class="screen" id="s-plan">
+    <div class="tabs" id="planTabs">
+      <button data-mode="swing" class="on">ระยะยาว (Swing 4H)</button>
+      <button data-mode="short">ระยะสั้น (1H)</button>
+    </div>
+    <div id="planBody"></div>
+  </section>
 
-  <div id="calcSplitRows"></div>
+  <section class="screen" id="s-calc">
+    <div class="card stack" style="gap:12px">
+      <span class="lbl">คำนวณขนาดออเดอร์</span>
+      <div class="fields">
+        <div class="field"><label>ทุน (USD)</label><input type="number" id="cBal" value="1000" inputmode="decimal" /></div>
+        <div class="field"><label>เสี่ยงต่อไม้ (%)</label><input type="number" id="cRisk" value="1" step="0.1" inputmode="decimal" /></div>
+        <div class="field"><label>Entry</label><input type="number" id="cEntry" inputmode="decimal" /></div>
+        <div class="field"><label>Stop Loss</label><input type="number" id="cSl" inputmode="decimal" /></div>
+        <div class="field wide"><label>Take Profit</label><input type="number" id="cTp" inputmode="decimal" /></div>
+      </div>
+    </div>
+    <div class="out" id="calcOut"></div>
+    <div id="calcWarn" style="display:none; font:400 11px/1.6 var(--sans); color:var(--warn); background:rgba(250,178,25,.07); border:1px solid rgba(250,178,25,.3); border-radius:10px; padding:10px 12px; text-wrap:pretty"></div>
+    <p class="fine" style="margin:0">สมมติทองคำ 1 lot = 100 ออนซ์ (ราคาขยับ $1 = $100 ต่อ 1 lot) ค่าจริงอาจต่างตามโบรกเกอร์ · คำนวณในเครื่องล้วนๆ ไม่เชื่อมต่อบัญชีเทรด</p>
+    <div class="card stack" style="gap:2px" id="histCard">
+      <span class="lbl" style="margin-bottom:8px">ประวัติล่าสุด</span>
+      <div id="histList"></div>
+    </div>
+  </section>
+</main>
 
-  <div class="calc-result" style="margin-top:4px">
-    <div class="item"><div class="lbl">เสี่ยงรวมเป็นเงิน</div><div class="val" id="calcRiskAmt">-</div></div>
-    <div class="item"><div class="lbl">Lot รวมทุกไม้</div><div class="val" id="calcLot">-</div></div>
-    <div class="item"><div class="lbl">กำไรรวมถ้าชน TP ครบทุกไม้</div><div class="val" id="calcRewardTotal">-</div></div>
-    <div class="item"><div class="lbl">R:R รวม (ถ่วงน้ำหนัก)</div><div class="val" id="calcBlendedRR">-</div></div>
-    <div class="item"><div class="lbl">Entry เฉลี่ย (ถ่วงน้ำหนักด้วย Lot)</div><div class="val" id="calcAvgEntry">-</div></div>
-  </div>
-  <div class="calc-note" id="calcWarning" style="display:none; color:var(--warning)"></div>
-  <div class="calc-note">คำนวณจากสมมติฐานทองคำ 1 lot มาตรฐาน = 100 ออนซ์ (การเคลื่อนไหว $1 = $100 ต่อ 1 lot, 0.01 lot = 1 micro lot) แต่ละไม้กำหนด Entry / SL / TP ของตัวเองได้อิสระ (เหมาะกับการวางไม้แบบ scale-in หลายราคาในโซนเดียวกัน) — ค่าจริงอาจแตกต่างกันตามโบรกเกอร์ของคุณ เป็นเครื่องมือคำนวณฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมต่อบัญชีเทรดใดๆ</div>
-</div>
-
-<div id="history" class="card" style="display:none; margin-top:16px">
-  <div class="section-label" style="margin-bottom:12px">ประวัติล่าสุด</div>
-  <div id="historyList"></div>
-</div>
+<nav id="nav">
+  <button data-tab="overview" class="on"><i></i><span>สรุป</span></button>
+  <button data-tab="chart"><i></i><span>กราฟ</span></button>
+  <button data-tab="plan"><i></i><span>แผนเทรด</span></button>
+  <button data-tab="calc"><i></i><span>คำนวณ</span></button>
+</nav>
 
 <script>
-  // ค่านี้เป็น anon public key ของ Supabase — ออกแบบมาให้เปิดเผยฝั่ง client ได้ตามปกติ
-  // (การป้องกันการเขียน/แก้ไขข้อมูลทำผ่าน Row Level Security policy ในฝั่ง Supabase แทน)
-  const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
+/* ---------- config ---------- */
+const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
+const TF_KEYS = ['4h','1h','15m'], TF_LABEL = {'4h':'4H','1h':'1H','15m':'15M'};
 
-  const TF_LABEL = { '4h': '4H', '1h': '1H', '15m': '15M' };
-  let latestRow = null;
-  let chart, series, activeTf = '1h';
+let rows = [], row = null, activeTf = '1h', planMode = 'swing', chart = null, series = null, priceLines = [];
 
-  async function loadData() {
-    try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/xauusd_analysis?select=*&order=created_at.desc&limit=20`,
-        { headers: { apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
-      );
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const rows = await res.json();
-      if (!Array.isArray(rows) || !rows.length) {
-        document.getElementById('latest').textContent = 'ยังไม่มีข้อมูล (รอรอบวิเคราะห์แรกทำงาน)';
-        return;
-      }
-      latestRow = rows[0];
-      renderLatest(latestRow);
-      renderTradeIdea(latestRow);
-      renderChartCard(latestRow);
-      renderTimeframes(latestRow);
-      prefillCalculator(latestRow);
-      renderHistory(rows.slice(1));
-    } catch (e) {
-      document.getElementById('latest').className = 'card error';
-      document.getElementById('latest').textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + e.message;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const fmt = (n, d=2) => n == null ? '-' : n.toLocaleString('en-US',{minimumFractionDigits:d, maximumFractionDigits:d});
+const biasCls = b => ['Long','Short','Wait'].includes(b) ? b : 'Wait';
+const badge = (b, sm) => `<span class="badge b-${biasCls(b)}${sm?' sm':''}">${esc(b || 'Wait')}</span>`;
+
+/* ---------- tabs ---------- */
+$('#nav').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  $('#s-' + b.dataset.tab).classList.add('on');
+  localStorage.setItem('xau_tab', b.dataset.tab);
+  if (b.dataset.tab === 'chart') requestAnimationFrame(() => { buildChart(); chart && chart.timeScale().fitContent(); });
+});
+(function restoreTab(){
+  const t = localStorage.getItem('xau_tab');
+  const b = t && document.querySelector(`#nav button[data-tab="${t}"]`);
+  if (b) b.click();
+})();
+
+$('#chartTabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#chartTabs button').forEach(x => x.classList.toggle('on', x === b));
+  activeTf = b.dataset.tf; drawChart(); renderChartLevels();
+});
+$('#planTabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#planTabs button').forEach(x => x.classList.toggle('on', x === b));
+  planMode = b.dataset.mode; renderPlan();
+});
+
+/* ---------- load ---------- */
+async function load() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/xauusd_analysis?select=*&order=created_at.desc&limit=20`,
+      { headers: { apikey: SUPABASE_ANON_KEY, authorization: 'Bearer ' + SUPABASE_ANON_KEY } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length) { $('#ovState').textContent = 'ยังไม่มีข้อมูล (รอรอบวิเคราะห์แรกทำงาน)'; setLive('NO DATA', true); return; }
+    row = rows[0];
+    localStorage.setItem('xau_cache', JSON.stringify(rows.slice(0, 5)));
+    render();
+  } catch (e) {
+    const cached = localStorage.getItem('xau_cache');
+    if (cached) {
+      try { rows = JSON.parse(cached); row = rows[0]; render(); setLive('OFFLINE', true); return; } catch (_) {}
     }
+    $('#ovState').className = 'state err';
+    $('#ovState').textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + e.message;
+    setLive('ERROR', true);
   }
+}
 
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+function setLive(text, stale) {
+  $('#liveText').textContent = text;
+  $('#live').classList.toggle('stale', !!stale);
+}
 
-  function badge(bias, small) {
-    const cls = ['Long', 'Short', 'Wait'].includes(bias) ? bias : 'Wait';
-    return `<span class="badge badge-${cls}${small ? ' badge-sm' : ''}">${esc(bias || 'Wait')}</span>`;
-  }
+function render() {
+  const age = (Date.now() - new Date(row.created_at).getTime()) / 36e5;
+  setLive(age > 6 ? 'STALE' : 'LIVE', age > 6);
+  renderOverview(); renderPlan(); prefillCalc(); calc(); renderHistory();
+  if ($('#s-chart').classList.contains('on')) { buildChart(); }
+}
 
-  function tag(text, kind) {
-    return `<span class="tag-${kind}">${esc(text)}</span>`;
-  }
+/* ---------- confluence ---------- */
+function clusters(items, tol) {
+  const out = [];
+  [...items].sort((a,b) => a.price - b.price).forEach(it => {
+    let c = out.find(c => Math.abs(c.avg - it.price) <= tol);
+    if (!c) { c = { avg: it.price, items: [] }; out.push(c); }
+    c.items.push(it);
+    c.avg = c.items.reduce((s,i) => s + i.price, 0) / c.items.length;
+  });
+  return out.map(c => ({ avg: c.avg, tfs: [...new Set(c.items.map(i => i.tf))] }));
+}
+function collect() {
+  const tfs = row.timeframes_json || {};
+  const ref = num(row.price_snapshot) || 4500, tol = Math.max(1.5, ref * 0.0007);
+  const sup = [], res = [];
+  TF_KEYS.forEach(k => {
+    const d = tfs[k]; if (!d) return;
+    (d.support_levels || []).forEach(l => { const p = num(l); if (p) sup.push({ tf:k, price:p }); });
+    (d.resistance_levels || []).forEach(l => { const p = num(l); if (p) res.push({ tf:k, price:p }); });
+  });
+  return { tol, sup: clusters(sup, tol), res: clusters(res, tol) };
+}
+function cls(price, cl, tol) {
+  const c = cl.find(x => Math.abs(x.avg - price) <= tol);
+  if (!c) return '';
+  return c.tfs.length >= 3 ? 'c3' : c.tfs.length === 2 ? 'c2' : '';
+}
+function levelList(arr, cl, tol) {
+  if (!arr || !arr.length) return '-';
+  return arr.map(l => { const p = num(l); const c = p ? cls(p, cl, tol) : ''; return c ? `<span class="${c}">${esc(l)}</span>` : esc(l); }).join(', ');
+}
 
-  function renderLatest(row) {
-    const t = new Date(row.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
-    document.getElementById('latest').className = 'card';
-    document.getElementById('latest').innerHTML = `
-      <div class="price-row">
+/* ---------- overview ---------- */
+function renderOverview() {
+  const t = new Date(row.created_at).toLocaleString('th-TH', { dateStyle:'medium', timeStyle:'short' });
+  const { tol, sup, res } = collect();
+  const price = num(row.price_snapshot);
+
+  const multi = c => c.tfs.length >= 2;
+  const top = res.filter(c => multi(c) && (price == null || c.avg >= price))
+    .sort((a,b) => b.tfs.length - a.tfs.length || a.avg - b.avg).slice(0, 2)
+    .map(c => ({ ...c, kind:'แนวต้าน', color: c.tfs.length >= 3 ? '#d03b3b' : 'rgba(208,59,59,.6)' }));
+  const bot = sup.filter(c => multi(c) && (price == null || c.avg <= price))
+    .sort((a,b) => b.tfs.length - a.tfs.length || b.avg - a.avg).slice(0, 2)
+    .map(c => ({ ...c, kind:'แนวรับ', color: c.tfs.length >= 3 ? '#0ca30c' : 'rgba(12,163,12,.6)' }));
+  const levels = [...top, ...bot].sort((a,b) => b.avg - a.avg);
+
+  const tfs = row.timeframes_json || {}, inds = row.indicators_json || {};
+
+  $('#ovState').style.display = 'none';
+  const el = $('#ovBody'); el.style.display = 'flex';
+  el.innerHTML = `
+    <div class="card gold">
+      <div class="price-top">
         <div>
-          <div class="price">$${esc(row.price_snapshot)}</div>
-          <div class="updated">อัปเดตล่าสุด ${esc(t)}</div>
+          <div class="lbl">ราคาปัจจุบัน</div>
+          <div class="price" style="margin-top:4px">$${fmt(price)}</div>
+          <div class="updated">อัปเดต ${esc(t)}</div>
         </div>
-        <div class="badge-row">
-          ${row.confidence_score != null ? `<span class="conf-badge">Confidence ${esc(row.confidence_score)}%</span>` : ''}
+        <div class="side">
           ${badge(row.bias)}
+          ${row.confidence_score != null ? `<span class="conf"><small>CONFIDENCE</small><b>${esc(row.confidence_score)}%</b></span>` : ''}
         </div>
+      </div>
+      <div class="hr"></div>
+      <div class="stack" style="gap:5px">
+        <span class="lbl">แผนโดยรวม · CONFLUENCE</span>
+        <div class="body">${esc(row.plan_summary) || '-'}</div>
+      </div>
+      ${row.confidence_note ? `<div class="stack" style="gap:5px; margin-top:12px">
+        <span class="lbl">ข้อควรระวัง</span>
+        <div class="body dim">${esc(row.confidence_note)}</div>
+      </div>` : ''}
+      ${row.structure_note ? `<div class="stack" style="gap:5px; margin-top:12px">
+        <span class="lbl">ภาพรวมโครงสร้างราคา</span>
+        <div class="body dim">${esc(row.structure_note)}</div>
+      </div>` : ''}
+    </div>
+
+    ${levels.length ? `<div class="stack">
+      <span class="lbl">แนวรับ / แนวต้าน ที่ตรงกันหลาย TIMEFRAME</span>
+      <div class="stack" style="gap:7px">
+        ${levels.map(c => `
+          <div class="lvl">
+            <div class="l">
+              <span class="bar" style="background:${c.color}"></span>
+              <div>
+                <div class="p">${fmt(c.avg)}</div>
+                <div class="k">${c.kind} · ตรงกัน ${c.tfs.length} TF</div>
+              </div>
+            </div>
+            <span class="tf">${c.tfs.map(k => TF_LABEL[k]).join('·')}</span>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="stack">
+      <span class="lbl">รายละเอียดแต่ละ TIMEFRAME</span>
+      ${TF_KEYS.map(k => {
+        const d = tfs[k]; if (!d) return '';
+        const i = inds[k] || {};
+        const rk = i.rsiStatus === 'Overbought' ? 'r' : i.rsiStatus === 'Oversold' ? 'g' : 'n';
+        const mk = i.macdStatus === 'Bullish' ? 'g' : i.macdStatus === 'Bearish' ? 'r' : 'n';
+        return `
+        <div class="tfc">
+          <div class="h"><span class="n">${TF_LABEL[k]}</span>${badge(d.bias, true)}</div>
+          <div class="t">เทรนด์: ${esc(d.trend) || '-'}</div>
+          <div class="note">${esc(d.structure_note) || '-'}</div>
+          ${d.smc_zones ? `<div class="smc">SMC: ${esc(d.smc_zones)}</div>` : ''}
+          <div class="lv">
+            <div><div class="lbl">แนวรับ</div>${levelList(d.support_levels, sup, tol)}</div>
+            <div><div class="lbl">แนวต้าน</div>${levelList(d.resistance_levels, res, tol)}</div>
+          </div>
+          <div class="ind">
+            <span>RSI <b class="${rk}">${i.rsi14 != null ? esc(i.rsi14) : '-'}</b></span>
+            <span>MACD <b class="${mk}">${esc(i.macdStatus || 'Neutral')}</b></span>
+            <span>EMA50 <b class="n">${i.ema50 != null ? esc(i.ema50) : '-'}</b></span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="fine" style="margin-bottom:2px">
+      <span class="c3">ตัวหนาสีทอง</span> = ตรงกันทั้ง 3 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน 2 timeframe
+    </div>
+    <div class="disc">⚠️ สรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุน ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ</div>
+  `;
+}
+
+/* ---------- chart ---------- */
+function buildChart() {
+  if (chart || typeof LightweightCharts === 'undefined') { drawChart(); return; }
+  chart = LightweightCharts.createChart($('#chart'), {
+    autoSize: true,
+    layout: { background: { color: 'transparent' }, textColor: '#898781', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 },
+    grid: { vertLines: { color: 'rgba(255,255,255,.05)' }, horzLines: { color: 'rgba(255,255,255,.05)' } },
+    rightPriceScale: { borderColor: 'rgba(255,255,255,.12)' },
+    timeScale: { borderColor: 'rgba(255,255,255,.12)', timeVisible: true, secondsVisible: false },
+    crosshair: { vertLine: { color: 'rgba(212,175,55,.5)' }, horzLine: { color: 'rgba(212,175,55,.5)' } },
+    handleScale: { axisPressedMouseMove: false }
+  });
+  series = chart.addCandlestickSeries({
+    upColor: '#0ca30c', downColor: '#d03b3b', borderVisible: false,
+    wickUpColor: '#0ca30c', wickDownColor: '#d03b3b'
+  });
+  drawChart(); renderChartLevels();
+}
+
+function drawChart() {
+  $('#chartTitle').textContent = TF_LABEL[activeTf] + ' · CANDLES';
+  if (!row || !series) return;
+  const arr = (row.raw_candles || {})[activeTf];
+  if (!Array.isArray(arr) || !arr.length) { series.setData([]); $('#chartRange').textContent = 'ไม่มีข้อมูลกราฟ'; return; }
+  const data = arr.map(c => ({
+    time: Math.floor(new Date(String(c.time).replace(' ','T') + 'Z').getTime() / 1000),
+    open: +c.open, high: +c.high, low: +c.low, close: +c.close
+  })).filter(c => Number.isFinite(c.time)).sort((a,b) => a.time - b.time);
+  series.setData(data);
+  chart.timeScale().fitContent();
+  const hi = Math.max(...data.map(c => c.high)), lo = Math.min(...data.map(c => c.low));
+  $('#chartRange').textContent = fmt(lo,0) + ' – ' + fmt(hi,0);
+
+  priceLines.forEach(l => series.removePriceLine(l)); priceLines = [];
+  const d = (row.timeframes_json || {})[activeTf] || {};
+  (d.support_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(12,163,12,.7)', lineWidth:1, lineStyle:2, title:'S' })); });
+  (d.resistance_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(208,59,59,.7)', lineWidth:1, lineStyle:2, title:'R' })); });
+}
+
+function renderChartLevels() {
+  if (!row) return;
+  const d = (row.timeframes_json || {})[activeTf] || {};
+  const { tol, sup, res } = collect();
+  $('#chartLevels').innerHTML = `
+    <div class="stat"><div class="k">แนวรับ</div><div class="v n" style="font-size:12px; line-height:1.6">${levelList(d.support_levels, sup, tol)}</div></div>
+    <div class="stat"><div class="k">แนวต้าน</div><div class="v n" style="font-size:12px; line-height:1.6">${levelList(d.resistance_levels, res, tol)}</div></div>
+  `;
+}
+
+/* ---------- plan ---------- */
+function renderPlan() {
+  if (!row) return;
+  const ti = (planMode === 'short' ? row.trade_idea_short_json : row.trade_idea_json) || {};
+  const has = ti.entry_zone && ti.entry_zone !== '-';
+  const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
+  const el = $('#planBody');
+
+  if (!has) {
+    el.innerHTML = `<div class="card"><div class="fine">โครงสร้าง ${planMode === 'short' ? '1H' : '4H'} ตอนนี้ยังไม่ชัดเจนพอจะเสนอแผน${planMode === 'short' ? 'ระยะสั้น' : 'ระยะยาว'} — ลองดูอีกแผน หรือรอรอบวิเคราะห์ถัดไป</div></div>`;
+    return;
+  }
+  const dir = biasCls(ti.direction || row.bias);
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
+        <span class="lbl">แนวคิดแผนเทรด</span>
+        ${badge(dir + ' · ' + (planMode === 'short' ? '1H' : '4H'), true).replace('b-Wait','b-'+dir)}
       </div>
       <div class="grid2">
-        <div>
-          <div class="section-label">แผนโดยรวม (Confluence)</div>
-          <div class="body-text primary">${esc(row.plan_summary) || '-'}</div>
-        </div>
-        <div>
-          <div class="section-label">ข้อควรระวัง</div>
-          <div class="body-text">${esc(row.confidence_note) || '-'}</div>
-        </div>
+        <div class="stat"><div class="k">ENTRY ZONE</div><div class="v" style="color:var(--gold)">${esc(ti.entry_zone)}</div></div>
+        <div class="stat"><div class="k">STOP LOSS</div><div class="v" style="color:var(--crit)">${esc(ti.stop_loss) || '-'}</div></div>
+        <div class="stat"><div class="k">TAKE PROFIT</div><div class="v" style="color:var(--good)">${esc(tp.join(' / ')) || '-'}</div></div>
+        <div class="stat"><div class="k">R:R</div><div class="v">${esc(ti.rr_ratio) || '-'}</div></div>
       </div>
-      ${row.structure_note ? `
-      <div style="margin-top:14px">
-        <div class="section-label">ภาพรวมโครงสร้างราคา</div>
-        <div class="body-text">${esc(row.structure_note)}</div>
-      </div>` : ''}
-    `;
-  }
+      <div class="fine" style="margin-top:12px">${esc(ti.note) || 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง'}</div>
+      <button id="usePlan" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
+    </div>
+  `;
+  $('#usePlan').onclick = () => {
+    const e0 = num(String(ti.entry_zone).split(/[–\-—]/)[0]);
+    if (e0) $('#cEntry').value = e0;
+    const s0 = num(ti.stop_loss); if (s0) $('#cSl').value = s0;
+    const t0 = num(tp[0]); if (t0) $('#cTp').value = t0;
+    calc();
+    document.querySelector('#nav button[data-tab="calc"]').click();
+  };
+}
 
-  let tradeMode = 'swing'; // 'swing' = ระยะยาว 4H/1H | 'short' = ระยะสั้น 15M
+/* ---------- calculator ---------- */
+function prefillCalc() {
+  const ti = row.trade_idea_json || {};
+  const e0 = num(String(ti.entry_zone || '').split(/[–\-—]/)[0]) || num(row.price_snapshot);
+  if (e0 && !$('#cEntry').value) $('#cEntry').value = e0;
+  const s0 = num(ti.stop_loss); if (s0 && !$('#cSl').value) $('#cSl').value = s0;
+  const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
+  const t0 = num(tp[0]); if (t0 && !$('#cTp').value) $('#cTp').value = t0;
+  ['cBal','cRisk'].forEach(id => { const v = localStorage.getItem('xau_' + id); if (v) $('#' + id).value = v; });
+}
+function calc() {
+  const bal = num($('#cBal').value) || 0, risk = num($('#cRisk').value) || 0;
+  const entry = num($('#cEntry').value), sl = num($('#cSl').value), tp = num($('#cTp').value);
+  const dist = entry != null && sl != null ? Math.abs(entry - sl) : null;
+  const riskAmt = bal * risk / 100;
+  const lot = dist ? riskAmt / (dist * 100) : null;
+  const rewardDist = entry != null && tp != null ? Math.abs(tp - entry) : null;
+  const reward = lot != null && rewardDist != null ? rewardDist * 100 * lot : null;
+  const rr = dist && rewardDist != null ? rewardDist / dist : null;
+  const lotTxt = lot == null ? '-' : lot >= 0.01 ? fmt(lot) : fmt(lot, 4);
+  const items = [
+    ['ระยะ SL', dist != null ? '$' + fmt(dist) : '-'],
+    ['LOT SIZE', lotTxt],
+    ['เสี่ยงเป็นเงิน', '$' + fmt(riskAmt, 0)],
+    ['กำไรถ้าถึง TP', reward != null ? '$' + fmt(reward, 0) : '-'],
+    ['R:R', rr != null ? '1 : ' + fmt(rr) : '-'],
+    ['% ต่อพอร์ต', fmt(risk, 1) + '%']
+  ];
+  $('#calcOut').innerHTML = items.map(([k,v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  const warn = $('#calcWarn');
+  if (lot != null && lot > 0 && lot < 0.01) {
+    warn.style.display = 'block';
+    warn.textContent = 'Lot ที่คำนวณได้ (' + fmt(lot, 4) + ') ต่ำกว่าขั้นต่ำของโบรกเกอร์ทั่วไป (0.01) — ถ้าเข้าที่ 0.01 lot จะเสี่ยงจริงราว $' + fmt(dist * 100 * 0.01, 0) + ' (' + fmt(dist * 100 * 0.01 / (bal || 1) * 100, 1) + '% ของทุน) ลองลด SL ให้แคบลง หรือเพิ่ม % เสี่ยง';
+  } else { warn.style.display = 'none'; }
+  localStorage.setItem('xau_cBal', $('#cBal').value);
+  localStorage.setItem('xau_cRisk', $('#cRisk').value);
+}
+['cBal','cRisk','cEntry','cSl','cTp'].forEach(id => $('#' + id).addEventListener('input', calc));
+calc();
 
-  document.getElementById('tradeModeTabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.chart-tab');
-    if (!btn) return;
-    document.querySelectorAll('#tradeModeTabs .chart-tab').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    tradeMode = btn.dataset.mode;
-    if (latestRow) renderTradeIdea(latestRow);
-  });
+/* ---------- history ---------- */
+function renderHistory() {
+  const list = rows.slice(1, 8);
+  $('#histCard').style.display = list.length ? 'flex' : 'none';
+  $('#histList').innerHTML = list.map(r => {
+    const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
+    return `<div class="hist"><span>${esc(t)}</span><span class="p">$${fmt(num(r.price_snapshot))}</span>${badge(r.bias, true)}</div>`;
+  }).join('');
+}
 
-  function renderTradeIdea(row) {
-    const swing = row.trade_idea_json;
-    const short = row.trade_idea_short_json;
-    const card = document.getElementById('tradeCard');
-    const hasSwing = swing && typeof swing === 'object' && swing.entry_zone && swing.entry_zone !== '-';
-    const hasShort = short && typeof short === 'object' && short.entry_zone && short.entry_zone !== '-';
-    if (!hasSwing && !hasShort) { card.style.display = 'none'; return; }
-    card.style.display = 'block';
-
-    const ti = (tradeMode === 'short' ? short : swing) || {};
-    const isShort = tradeMode === 'short';
-    const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
-    const hasThisPlan = ti.entry_zone && ti.entry_zone !== '-';
-
-    document.getElementById('tradeGrid').innerHTML = hasThisPlan ? `
-      <div class="trade-stat"><div class="lbl">Entry Zone</div><div class="val">${esc(ti.entry_zone) || '-'}</div></div>
-      <div class="trade-stat"><div class="lbl">Stop Loss</div><div class="val">${esc(ti.stop_loss) || '-'}</div></div>
-      <div class="trade-stat"><div class="lbl">Take Profit</div><div class="val">${esc(tp.join(' / ')) || '-'}</div></div>
-      <div class="trade-stat"><div class="lbl">R:R</div><div class="val">${esc(ti.rr_ratio) || '-'}</div></div>
-    ` : `<div class="trade-note" style="margin-top:0">โครงสร้าง ${isShort ? '1H' : '4H'} ตอนนี้ยังไม่ชัดเจนพอให้เสนอแผน${isShort ? 'ระยะสั้น' : 'ระยะยาว'} ลองดูอีกแผนแทน หรือรอรอบวิเคราะห์ถัดไป</div>`;
-
-    document.getElementById('tradeNote').textContent = isShort
-      ? (ti.note || 'แผนระยะสั้นอิงโครงสร้าง 1H เป็นหลัก (ดู 15M ประกอบแค่จับจังหวะเข้า) SL แคบกว่าแผนระยะยาว แต่กว้างกว่าถ้าอิง 15M ตรงๆ เพื่อลดโอกาสโดน noise สะบัดออกบ่อยเกินไป ควรบริหารความเสี่ยงให้เหมาะสม ไม่ใช่คำสั่งที่ต้องทำตาม')
-      : 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาระยะยาว (4H) เท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง';
-  }
-
-  function gaugeLine(ind) {
-    if (!ind) return '<div class="tf-gauge">ยังไม่มีข้อมูล indicator</div>';
-    const rsiKind = ind.rsiStatus === 'Overbought' ? 'critical' : ind.rsiStatus === 'Oversold' ? 'good' : 'neutral';
-    const macdKind = ind.macdStatus === 'Bullish' ? 'good' : ind.macdStatus === 'Bearish' ? 'critical' : 'neutral';
-    const emaParts = [];
-    if (ind.ema20 != null) emaParts.push(`EMA20 ${ind.ema20}`);
-    if (ind.ema50 != null) emaParts.push(`EMA50 ${ind.ema50}`);
-    if (ind.ema200 != null) emaParts.push(`EMA200 ${ind.ema200}`);
-    return `
-      <div class="tf-gauge">
-        <div><b>RSI14</b> ${ind.rsi14 != null ? esc(ind.rsi14) : '-'} · ${tag(ind.rsiStatus || 'Neutral', rsiKind)}</div>
-        <div><b>MACD</b> ${tag(ind.macdStatus || 'Neutral', macdKind)}${ind.macd ? ` (hist ${esc(ind.macd.histogram)})` : ''}</div>
-        <div><b>EMA</b> ${esc(emaParts.join(' / ')) || '-'}</div>
-      </div>
-    `;
-  }
-
-  // ---------- หาแนวรับ/แนวต้านที่ "ตรงกัน" ข้าม timeframe (confluence) เพื่อไฮไลต์ให้เด่น ----------
-  function clusterLevels(levelsWithTf, tolerance) {
-    const sorted = [...levelsWithTf].sort((a, b) => a.price - b.price);
-    const clusters = [];
-    sorted.forEach((item) => {
-      let cluster = clusters.find((c) => Math.abs(c.avg - item.price) <= tolerance);
-      if (!cluster) { cluster = { avg: item.price, items: [] }; clusters.push(cluster); }
-      cluster.items.push(item);
-      cluster.avg = cluster.items.reduce((s, i) => s + i.price, 0) / cluster.items.length;
-    });
-    return clusters.map((c) => ({ avg: c.avg, tfCount: new Set(c.items.map((i) => i.tf)).size }));
-  }
-
-  function confluenceClass(price, clusters, tolerance) {
-    if (!Number.isFinite(price)) return '';
-    const c = clusters.find((cl) => Math.abs(cl.avg - price) <= tolerance);
-    if (!c) return '';
-    if (c.tfCount >= 3) return 'level-confluence-3';
-    if (c.tfCount === 2) return 'level-confluence-2';
-    return '';
-  }
-
-  function renderLevelList(levels, clusters, tolerance) {
-    const arr = levels || [];
-    if (!arr.length) return '-';
-    return arr.map((lvl) => {
-      const price = parseFloat(lvl);
-      const cls = confluenceClass(price, clusters, tolerance);
-      return cls ? `<span class="${cls}">${esc(lvl)}</span>` : esc(lvl);
-    }).join(', ');
-  }
-
-  function renderTimeframes(row) {
-    const tfs = row.timeframes_json;
-    const inds = row.indicators_json || {};
-    const grid = document.getElementById('tfGrid');
-    if (!tfs || typeof tfs !== 'object') {
-      document.getElementById('tfSection').style.display = 'none';
-      return;
-    }
-    document.getElementById('tfSection').style.display = 'block';
-
-    // รวมแนวรับ/แนวต้านจากทั้ง 3 timeframe เข้าด้วยกัน แล้วจัดกลุ่มที่ราคาใกล้เคียงกัน (tolerance ตามราคาปัจจุบัน)
-    const priceRef = parseFloat(row.price_snapshot) || 4500;
-    const tolerance = Math.max(1.5, priceRef * 0.0007);
-    const allSupport = [], allResistance = [];
-    ['4h', '1h', '15m'].forEach((key) => {
-      const d = tfs[key];
-      if (!d) return;
-      (d.support_levels || []).forEach((lvl) => {
-        const price = parseFloat(lvl);
-        if (Number.isFinite(price)) allSupport.push({ tf: key, price });
-      });
-      (d.resistance_levels || []).forEach((lvl) => {
-        const price = parseFloat(lvl);
-        if (Number.isFinite(price)) allResistance.push({ tf: key, price });
-      });
-    });
-    const supportClusters = clusterLevels(allSupport, tolerance);
-    const resistanceClusters = clusterLevels(allResistance, tolerance);
-
-    grid.innerHTML = ['4h', '1h', '15m'].map((key) => {
-      const d = tfs[key];
-      if (!d) return '';
-      return `
-        <div class="tf-card">
-          <div class="tf-head">
-            <span class="tf-name">${TF_LABEL[key]}</span>
-            ${badge(d.bias, true)}
-          </div>
-          <div class="tf-trend">เทรนด์: ${esc(d.trend) || '-'}</div>
-          <div class="tf-note">${esc(d.structure_note) || '-'}</div>
-          ${d.smc_zones ? `<div class="tf-smc">SMC: ${esc(d.smc_zones)}</div>` : ''}
-          <div class="tf-levels">
-            <div>
-              <div class="lbl">แนวรับ</div>
-              <div class="val">${renderLevelList(d.support_levels, supportClusters, tolerance)}</div>
-            </div>
-            <div>
-              <div class="lbl">แนวต้าน</div>
-              <div class="val">${renderLevelList(d.resistance_levels, resistanceClusters, tolerance)}</div>
-            </div>
-          </div>
-          ${gaugeLine(inds[key])}
-        </div>
-      `;
-    }).join('');
-  }
-
-  function renderChartCard(row) {
-    const candles = row.raw_candles;
-    if (!candles || typeof candles !== 'object' || typeof LightweightCharts === 'undefined') {
-      return; // ไม่มีข้อมูลกราฟ หรือโหลดไลบรารีไม่สำเร็จ — ข้ามส่วนกราฟไปเงียบๆ
-    }
-    document.getElementById('chartCard').style.display = 'block';
-
-    if (!chart) {
-      chart = LightweightCharts.createChart(document.getElementById('chart'), {
-        autoSize: true,
-        layout: { background: { color: 'transparent' }, textColor: '#c3c2b7', fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
-        grid: { vertLines: { color: '#2c2c2a' }, horzLines: { color: '#2c2c2a' } },
-        rightPriceScale: { borderColor: '#383835' },
-        timeScale: { borderColor: '#383835', timeVisible: true, secondsVisible: false },
-      });
-      series = chart.addCandlestickSeries({
-        upColor: '#0ca30c', downColor: '#d03b3b', borderVisible: false,
-        wickUpColor: '#0ca30c', wickDownColor: '#d03b3b',
-      });
-
-      document.getElementById('chartTabs').addEventListener('click', (e) => {
-        const btn = e.target.closest('.chart-tab');
-        if (!btn) return;
-        document.querySelectorAll('.chart-tab').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeTf = btn.dataset.tf;
-        setChartData();
-      });
-    }
-    setChartData();
-  }
-
-  function setChartData() {
-    if (!latestRow || !series) return;
-    const arr = (latestRow.raw_candles || {})[activeTf];
-    if (!Array.isArray(arr) || !arr.length) return;
-    const data = arr
-      .map((c) => ({
-        time: Math.floor(new Date(c.time.replace(' ', 'T') + 'Z').getTime() / 1000),
-        open: c.open, high: c.high, low: c.low, close: c.close,
-      }))
-      .filter((c) => Number.isFinite(c.time))
-      .sort((a, b) => a.time - b.time);
-    series.setData(data);
-    chart.timeScale().fitContent();
-    renderStructureOverlay(data);
-  }
-
-  // ---------- วิเคราะห์โครงสร้างราคาบนกราฟ: จุดสวิง HH/HL/LH/LL + แนวรับ-แนวต้าน + เส้นแนวโน้ม ----------
-  // คำนวณจากราคาจริง (raw_candles) ล้วนๆ ฝั่งหน้าเว็บ ไม่พึ่ง AI ตรงนี้ เพื่อให้ตัวเลขตรงกับกราฟเป๊ะๆ
-  function detectSwingPoints(data, bars) {
-    const points = [];
-    for (let i = bars; i < data.length - bars; i++) {
-      const c = data[i];
-      let isHigh = true, isLow = true;
-      for (let j = i - bars; j <= i + bars; j++) {
-        if (j === i) continue;
-        if (data[j].high >= c.high) isHigh = false;
-        if (data[j].low <= c.low) isLow = false;
-      }
-      if (isHigh) points.push({ time: c.time, price: c.high, kind: 'high' });
-      if (isLow) points.push({ time: c.time, price: c.low, kind: 'low' });
-    }
-    points.sort((a, b) => a.time - b.time);
-
-    let prevHigh = null, prevLow = null;
-    return points.map((p) => {
-      let label;
-      if (p.kind === 'high') {
-        label = prevHigh == null ? 'H' : (p.price > prevHigh ? 'HH' : 'LH');
-        prevHigh = p.price;
-      } else {
-        label = prevLow == null ? 'L' : (p.price > prevLow ? 'HL' : 'LL');
-        prevLow = p.price;
-      }
-      return { ...p, label };
-    });
-  }
-
-  // ---------- ตรวจจับแพทเทิลแท่งเทียนพื้นฐาน (Engulfing / Hammer / Shooting Star / Doji) ----------
-  // คำนวณจากราคาจริงล้วนๆ ฝั่งหน้าเว็บเหมือนกับจุดสวิง ไม่พึ่ง AI จึงไม่มีต้นทุนเพิ่ม
-  function detectCandlePatterns(data) {
-    const results = [];
-    const n = data.length;
-    const start = Math.max(1, n - 30); // ดูแค่ ~30 แท่งล่าสุด ไม่ย้อนไปไกลเกินไป
-    for (let i = start; i < n; i++) {
-      const c = data[i];
-      const prev = data[i - 1];
-      const body = Math.abs(c.close - c.open);
-      const range = c.high - c.low;
-      if (range <= 0) continue;
-      const prevBody = Math.abs(prev.close - prev.open);
-      const upperWick = c.high - Math.max(c.open, c.close);
-      const lowerWick = Math.min(c.open, c.close) - c.low;
-      const isBullish = c.close > c.open;
-      const isBearish = c.close < c.open;
-      const prevBullish = prev.close > prev.open;
-      const prevBearish = prev.close < prev.open;
-
-      if (isBullish && prevBearish && c.open <= prev.close && c.close >= prev.open && body >= prevBody * 0.9) {
-        results.push({ time: c.time, price: c.low, pattern: 'Bullish Engulfing', signal: 'Long' });
-      } else if (isBearish && prevBullish && c.open >= prev.close && c.close <= prev.open && body >= prevBody * 0.9) {
-        results.push({ time: c.time, price: c.high, pattern: 'Bearish Engulfing', signal: 'Short' });
-      } else if (lowerWick >= body * 2 && upperWick <= range * 0.15 && body <= range * 0.4) {
-        // ไส้ล่างยาว ไส้บนแทบไม่มี ตัวเทียนเล็ก -> Hammer (สัญญาณกลับตัวขาขึ้น)
-        results.push({ time: c.time, price: c.low, pattern: 'Hammer', signal: 'Long' });
-      } else if (upperWick >= body * 2 && lowerWick <= range * 0.15 && body <= range * 0.4) {
-        // ไส้บนยาว ไส้ล่างแทบไม่มี ตัวเทียนเล็ก -> Shooting Star (สัญญาณกลับตัวขาลง)
-        results.push({ time: c.time, price: c.high, pattern: 'Shooting Star', signal: 'Short' });
-      } else if (body <= range * 0.08) {
-        // ตัวเทียนเล็กมาก ไส้สองข้างใกล้เคียงกัน -> Doji (ไม่ชัดเจน รอสัญญาณยืนยัน)
-        results.push({ time: c.time, price: c.high, pattern: 'Doji', signal: 'Neutral' });
-      }
-    }
-    return results.slice(-6); // จำกัดจำนวนไม่ให้กราฟรก เอาแค่ 6 อันล่าสุด
-  }
-
-  let trendLineSeries = [];
-  let activePriceLines = [];
-
-  function renderStructureOverlay(data) {
-    if (!chart || !series) return;
-    if (data.length < 12) {
-      series.setMarkers([]);
-      trendLineSeries.forEach((s) => chart.removeSeries(s));
-      trendLineSeries = [];
-      activePriceLines.forEach((pl) => series.removePriceLine(pl));
-      activePriceLines = [];
-      return;
-    }
-    const bars = data.length > 120 ? 4 : 2;
-    const swings = detectSwingPoints(data, bars);
-    const recent = swings.slice(-12); // เอาแค่จุดล่าสุด ไม่ให้กราฟรกเกินไป
-
-    // จุดสวิง HH/HL/LH/LL
-    const swingMarkers = recent.map((p) => ({
-      time: p.time,
-      position: p.kind === 'high' ? 'aboveBar' : 'belowBar',
-      color: (p.label === 'HH' || p.label === 'HL') ? '#0ca30c' : (p.label === 'LH' || p.label === 'LL') ? '#d03b3b' : '#c3c2b7',
-      shape: p.kind === 'high' ? 'arrowDown' : 'arrowUp',
-      text: `${p.label} ${p.price.toFixed(2)}`,
-    }));
-
-    // แพทเทิลแท่งเทียน -> สัญญาณ Long/Short/Neutral
-    const patterns = detectCandlePatterns(data);
-    const patternMarkers = patterns.map((p) => ({
-      time: p.time,
-      position: p.signal === 'Short' ? 'aboveBar' : p.signal === 'Long' ? 'belowBar' : 'inBar',
-      color: p.signal === 'Long' ? '#0ca30c' : p.signal === 'Short' ? '#d03b3b' : '#fab219',
-      shape: p.signal === 'Long' ? 'arrowUp' : p.signal === 'Short' ? 'arrowDown' : 'circle',
-      text: `${p.pattern}${p.signal !== 'Neutral' ? ' → ' + p.signal : ''}`,
-    }));
-
-    // รวม marker ทั้งหมดเป็นชุดเดียว (lightweight-charts รับได้ทีละชุดต่อ series เท่านั้น) เรียงตามเวลา
-    const markers = [...swingMarkers, ...patternMarkers].sort((a, b) => a.time - b.time);
-    series.setMarkers(markers);
-
-    // เส้นแนวโน้ม: ลากผ่านจุดต่ำสุด 2 จุดล่าสุด (แนวรับที่เอียง) และจุดสูงสุด 2 จุดล่าสุด (แนวต้านที่เอียง)
-    trendLineSeries.forEach((s) => chart.removeSeries(s));
-    trendLineSeries = [];
-    const lastLows = recent.filter((p) => p.kind === 'low').slice(-2);
-    const lastHighs = recent.filter((p) => p.kind === 'high').slice(-2);
-    [lastLows, lastHighs].forEach((pair) => {
-      if (pair.length === 2 && pair[0].time !== pair[1].time) {
-        const ln = chart.addLineSeries({
-          color: 'rgba(212,175,55,.7)', lineWidth: 2,
-          lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
-        });
-        ln.setData(pair.map((p) => ({ time: p.time, value: p.price })).sort((a, b) => a.time - b.time));
-        trendLineSeries.push(ln);
-      }
-    });
-
-    // แนวรับ/แนวต้านจาก AI (timeframes_json) — ตีเป็นเส้นราคาแนวนอนบนกราฟ
-    activePriceLines.forEach((pl) => series.removePriceLine(pl));
-    activePriceLines = [];
-    const tfs = (latestRow && latestRow.timeframes_json) || {};
-    const d = tfs[activeTf];
-    if (d) {
-      (d.support_levels || []).slice(0, 3).forEach((lvl) => {
-        const price = parseFloat(lvl);
-        if (!Number.isFinite(price)) return;
-        activePriceLines.push(series.createPriceLine({
-          price, color: '#0ca30c', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-          axisLabelVisible: true, title: 'S',
-        }));
-      });
-      (d.resistance_levels || []).slice(0, 3).forEach((lvl) => {
-        const price = parseFloat(lvl);
-        if (!Number.isFinite(price)) return;
-        activePriceLines.push(series.createPriceLine({
-          price, color: '#d03b3b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-          axisLabelVisible: true, title: 'R',
-        }));
-      });
-    }
-  }
-
-  // ---------- Lot Size Calculator แบบหลายไม้ Entry/SL/TP อิสระต่อไม้ — ฝั่งหน้าเว็บล้วนๆ ไม่เชื่อมบัญชีเทรดใดๆ ----------
-  function parseFirstNumber(s) {
-    if (s == null) return null;
-    const m = String(s).match(/-?\d+(\.\d+)?/);
-    return m ? parseFloat(m[0]) : null;
-  }
-
-  let lastTradeIdea = {};
-  let calcMode = 'lot'; // 'risk' = กำหนด % ความเสี่ยง -> คำนวณ lot | 'lot' = กำหนด lot เอง -> คำนวณความเสี่ยง/R:R
-
-  function prefillCalculator(row) {
-    lastTradeIdea = row.trade_idea_json || {};
-    renderSplitRows();
-  }
-
-  document.getElementById('calcModeTabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.chart-tab');
-    if (!btn) return;
-    document.querySelectorAll('#calcModeTabs .chart-tab').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    calcMode = btn.dataset.mode;
-    renderSplitRows();
-  });
-
-  function renderSplitRows() {
-    let n = parseInt(document.getElementById('calcSplits').value, 10);
-    if (!Number.isFinite(n) || n < 1) n = 1;
-    if (n > 6) n = 6;
-
-    const container = document.getElementById('calcSplitRows');
-    const existingEntries = Array.from(container.querySelectorAll('.split-entry input')).map((el) => el.value);
-    const existingSls = Array.from(container.querySelectorAll('.split-sl input')).map((el) => el.value);
-    const existingTps = Array.from(container.querySelectorAll('.split-tp input')).map((el) => el.value);
-    const existingLast = Array.from(container.querySelectorAll('.split-last input')).map((el) => el.value);
-
-    const entryFromIdea = parseFirstNumber(lastTradeIdea.entry_zone);
-    const tpFromIdea = Array.isArray(lastTradeIdea.take_profit) ? lastTradeIdea.take_profit : [];
-    const slFromIdea = parseFirstNumber(lastTradeIdea.stop_loss);
-    const equalPct = Math.round((100 / n) * 100) / 100;
-
-    const lastLabel = calcMode === 'lot' ? 'Lot' : '% เสี่ยง';
-    const lastPlaceholder = calcMode === 'lot' ? '0.01' : '';
-
-    let rows = '';
-    for (let i = 0; i < n; i++) {
-      const entryVal = existingEntries[i] || entryFromIdea || '';
-      const slVal = existingSls[i] || slFromIdea || '';
-      const tpVal = existingTps[i] || parseFirstNumber(tpFromIdea[i]) || '';
-      const lastVal = existingLast[i] || (calcMode === 'lot' ? '0.01' : (i === n - 1 ? (100 - equalPct * (n - 1)).toFixed(2) : equalPct));
-      rows += `
-        <div class="split-row">
-          <div class="split-idx">ไม้ที่ ${i + 1}</div>
-          <div class="split-inputs">
-            <div class="field split-entry"><label>Entry</label><input type="number" step="0.01" value="${entryVal}" /></div>
-            <div class="field split-sl"><label>SL</label><input type="number" step="0.01" value="${slVal}" /></div>
-            <div class="field split-tp"><label>TP</label><input type="number" step="0.01" value="${tpVal}" /></div>
-            <div class="field split-last"><label>${lastLabel}</label><input type="number" step="${calcMode === 'lot' ? '0.01' : '0.1'}" min="0" placeholder="${lastPlaceholder}" value="${lastVal}" /></div>
-          </div>
-          <div class="split-outputs">
-            <div class="split-out split-risk"><div class="lbl">เสี่ยงไม้นี้</div><div class="val">-</div></div>
-            <div class="split-out split-reward"><div class="lbl">กำไรถ้าชน TP</div><div class="val">-</div></div>
-            <div class="split-out split-rr"><div class="lbl">R:R ไม้นี้</div><div class="val">-</div></div>
-          </div>
-        </div>
-      `;
-    }
-    container.innerHTML = rows;
-    container.querySelectorAll('input').forEach((el) => el.addEventListener('input', runCalculator));
-    runCalculator();
-  }
-
-  function runCalculator() {
-    const balance = parseFloat(document.getElementById('calcBalance').value);
-
-    const riskAmtEl = document.getElementById('calcRiskAmt');
-    const lotEl = document.getElementById('calcLot');
-    const rewardEl = document.getElementById('calcRewardTotal');
-    const rrEl = document.getElementById('calcBlendedRR');
-    const avgEntryEl = document.getElementById('calcAvgEntry');
-    const warnEl = document.getElementById('calcWarning');
-    const rows = Array.from(document.querySelectorAll('#calcSplitRows .split-row'));
-
-    const clearOut = () => {
-      riskAmtEl.textContent = '-'; lotEl.textContent = '-'; rewardEl.textContent = '-';
-      rrEl.textContent = '-'; avgEntryEl.textContent = '-';
-      rows.forEach((row) => row.querySelectorAll('.split-out .val').forEach((el) => (el.textContent = '-')));
-    };
-
-    if (!rows.length) { warnEl.style.display = 'none'; clearOut(); return; }
-
-    let totalRisk = 0, totalReward = 0, totalLot = 0, weightedEntrySum = 0;
-    let anyBelowMin = false, anyIncomplete = false;
-
-    rows.forEach((row) => {
-      const entry = parseFloat(row.querySelector('.split-entry input').value);
-      const sl = parseFloat(row.querySelector('.split-sl input').value);
-      const tp = parseFloat(row.querySelector('.split-tp input').value);
-      const lastInput = parseFloat(row.querySelector('.split-last input').value);
-      const riskOut = row.querySelector('.split-risk .val');
-      const rewardOut = row.querySelector('.split-reward .val');
-      const rrOut = row.querySelector('.split-rr .val');
-
-      if (![entry, sl].every((v) => Number.isFinite(v)) || entry === sl || !Number.isFinite(lastInput) || lastInput <= 0) {
-        riskOut.textContent = '-'; rewardOut.textContent = '-'; rrOut.textContent = '-';
-        anyIncomplete = true;
-        return;
-      }
-
-      const distance = Math.abs(entry - sl);
-      let lot, rowRisk;
-      if (calcMode === 'lot') {
-        lot = lastInput;
-        rowRisk = lot * 100 * distance; // 1 lot มาตรฐาน = 100 oz
-      } else {
-        rowRisk = balance * (lastInput / 100);
-        lot = Number.isFinite(balance) ? rowRisk / (distance * 100) : NaN;
-      }
-      if (!Number.isFinite(lot)) {
-        riskOut.textContent = '-'; rewardOut.textContent = '-'; rrOut.textContent = '-';
-        anyIncomplete = true;
-        return;
-      }
-
-      totalRisk += rowRisk;
-      totalLot += lot;
-      weightedEntrySum += entry * lot;
-      if (lot > 0 && lot < 0.01) anyBelowMin = true;
-      riskOut.textContent = '$' + rowRisk.toFixed(2);
-
-      if (Number.isFinite(tp) && tp !== entry) {
-        const rowReward = lot * 100 * Math.abs(tp - entry);
-        totalReward += rowReward;
-        rewardOut.textContent = '$' + rowReward.toFixed(2);
-        rrOut.textContent = '1:' + (rowReward / rowRisk).toFixed(2);
-      } else {
-        rewardOut.textContent = '-';
-        rrOut.textContent = '-';
-      }
-    });
-
-    riskAmtEl.textContent = totalRisk > 0 ? '$' + totalRisk.toFixed(2) : '-';
-    lotEl.textContent = totalLot > 0 ? (totalLot < 0.01 ? totalLot.toFixed(4) : totalLot.toFixed(2)) + ' lot' : '-';
-    rewardEl.textContent = totalReward > 0 ? '$' + totalReward.toFixed(2) : '-';
-    rrEl.textContent = totalRisk > 0 && totalReward > 0 ? '1:' + (totalReward / totalRisk).toFixed(2) : '-';
-    avgEntryEl.textContent = totalLot > 0 ? '$' + (weightedEntrySum / totalLot).toFixed(2) : '-';
-
-    const warnings = [];
-    if (calcMode === 'risk' && !Number.isFinite(balance)) {
-      warnings.push('⚠️ ต้องกรอก "ทุนในบัญชี" ก่อน ถึงจะคำนวณจาก % ความเสี่ยงได้');
-    }
-    if (anyIncomplete) {
-      warnings.push('⚠️ บางไม้ยังกรอกไม่ครบ (Entry / SL ต้องไม่เท่ากัน และต้องกรอก ' + (calcMode === 'lot' ? 'Lot' : '% เสี่ยง') + ' ด้วย)');
-    }
-    if (anyBelowMin) {
-      warnings.push('⚠️ บางไม้คำนวณได้ต่ำกว่า 0.01 lot (micro lot) ซึ่งเป็นขนาดขั้นต่ำที่โบรกเกอร์ส่วนใหญ่กำหนด');
-    }
-    if (warnings.length) {
-      warnEl.style.display = 'block';
-      warnEl.innerHTML = warnings.join('<br>');
-    } else {
-      warnEl.style.display = 'none';
-    }
-  }
-
-  document.getElementById('calcBalance').addEventListener('input', runCalculator);
-  document.getElementById('calcSplits').addEventListener('input', renderSplitRows);
-
-  function renderHistory(rows) {
-    if (!rows.length) return;
-    document.getElementById('history').style.display = 'block';
-    document.getElementById('historyList').innerHTML = rows
-      .map((r) => {
-        const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
-        return `<div class="history-item">
-          <span>${esc(t)}</span>
-          <span class="h-price">$${esc(r.price_snapshot)}</span>
-          ${badge(r.bias, true)}
-        </div>`;
-      })
-      .join('');
-  }
-
-  renderSplitRows(); // ให้เครื่องคิดเลขใช้งานได้ทันทีแม้ข้อมูลวิเคราะห์ยังโหลดไม่เสร็จ
-  loadData();
-  setInterval(loadData, 5 * 60 * 1000); // รีเฟรชทุก 5 นาที
-
-  // ลงทะเบียน service worker เพื่อให้ "เพิ่มลงหน้าจอโฮม" ได้เหมือนแอป (ถ้าเบราว์เซอร์ไม่รองรับก็แค่ข้ามเงียบๆ ไม่กระทบอะไร)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
-  }
+/* ---------- pwa + refresh ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+setInterval(load, 5 * 60 * 1000);
+load();
 </script>
 </body>
 </html>
