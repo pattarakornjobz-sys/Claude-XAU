@@ -173,7 +173,7 @@
   <div class="section-label">แนวคิดแผนเทรด (ไม่ใช่คำสั่งซื้อขาย)</div>
   <div class="chart-tabs" id="tradeModeTabs">
     <button class="chart-tab active" data-mode="swing">ระยะยาว (Swing 4H/1H)</button>
-    <button class="chart-tab" data-mode="short">ระยะสั้น (Intraday 15M)</button>
+    <button class="chart-tab" data-mode="short">ระยะสั้น (Intraday 1H)</button>
   </div>
   <div class="trade-grid" id="tradeGrid"></div>
   <div class="trade-note" id="tradeNote">ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง</div>
@@ -193,6 +193,9 @@
     <span><i style="background:#0ca30c;opacity:.5"></i> เส้นประเขียว = แนวรับ (S)</span>
     <span><i style="background:#d03b3b;opacity:.5"></i> เส้นประแดง = แนวต้าน (R)</span>
     <span><i style="background:var(--gold)"></i> เส้นทอง = แนวโน้ม (Trendline)</span>
+    <span><i style="background:#0ca30c;border-radius:50%"></i> ▲ แพทเทิลสัญญาณ Long</span>
+    <span><i style="background:#d03b3b;border-radius:50%"></i> ▼ แพทเทิลสัญญาณ Short</span>
+    <span><i style="background:#fab219;border-radius:50%"></i> ● Doji (ไม่ชัดเจน)</span>
   </div>
 </div>
 
@@ -352,11 +355,11 @@
       <div class="trade-stat"><div class="lbl">Stop Loss</div><div class="val">${esc(ti.stop_loss) || '-'}</div></div>
       <div class="trade-stat"><div class="lbl">Take Profit</div><div class="val">${esc(tp.join(' / ')) || '-'}</div></div>
       <div class="trade-stat"><div class="lbl">R:R</div><div class="val">${esc(ti.rr_ratio) || '-'}</div></div>
-    ` : `<div class="trade-note" style="margin-top:0">โครงสร้าง ${isShort ? '15M' : '4H/1H'} ตอนนี้ยังไม่ชัดเจนพอให้เสนอแผน${isShort ? 'ระยะสั้น' : 'ระยะยาว'} ลองดูอีกแผนแทน หรือรอรอบวิเคราะห์ถัดไป</div>`;
+    ` : `<div class="trade-note" style="margin-top:0">โครงสร้าง ${isShort ? '1H' : '4H'} ตอนนี้ยังไม่ชัดเจนพอให้เสนอแผน${isShort ? 'ระยะสั้น' : 'ระยะยาว'} ลองดูอีกแผนแทน หรือรอรอบวิเคราะห์ถัดไป</div>`;
 
     document.getElementById('tradeNote').textContent = isShort
-      ? (ti.note || 'แผนระยะสั้นอิงโครงสร้าง 15M เท่านั้น SL แคบกว่าแผนระยะยาว จึงมีโอกาสโดน noise สะบัดออกบ่อยกว่า ควรบริหารความเสี่ยงให้เหมาะสม ไม่ใช่คำสั่งที่ต้องทำตาม')
-      : 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาระยะยาว (4H/1H) เท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง';
+      ? (ti.note || 'แผนระยะสั้นอิงโครงสร้าง 1H เป็นหลัก (ดู 15M ประกอบแค่จับจังหวะเข้า) SL แคบกว่าแผนระยะยาว แต่กว้างกว่าถ้าอิง 15M ตรงๆ เพื่อลดโอกาสโดน noise สะบัดออกบ่อยเกินไป ควรบริหารความเสี่ยงให้เหมาะสม ไม่ใช่คำสั่งที่ต้องทำตาม')
+      : 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาระยะยาว (4H) เท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดพิจารณาความเสี่ยงของตัวเองก่อนตัดสินใจทุกครั้ง';
   }
 
   function gaugeLine(ind) {
@@ -544,6 +547,44 @@
     });
   }
 
+  // ---------- ตรวจจับแพทเทิลแท่งเทียนพื้นฐาน (Engulfing / Hammer / Shooting Star / Doji) ----------
+  // คำนวณจากราคาจริงล้วนๆ ฝั่งหน้าเว็บเหมือนกับจุดสวิง ไม่พึ่ง AI จึงไม่มีต้นทุนเพิ่ม
+  function detectCandlePatterns(data) {
+    const results = [];
+    const n = data.length;
+    const start = Math.max(1, n - 30); // ดูแค่ ~30 แท่งล่าสุด ไม่ย้อนไปไกลเกินไป
+    for (let i = start; i < n; i++) {
+      const c = data[i];
+      const prev = data[i - 1];
+      const body = Math.abs(c.close - c.open);
+      const range = c.high - c.low;
+      if (range <= 0) continue;
+      const prevBody = Math.abs(prev.close - prev.open);
+      const upperWick = c.high - Math.max(c.open, c.close);
+      const lowerWick = Math.min(c.open, c.close) - c.low;
+      const isBullish = c.close > c.open;
+      const isBearish = c.close < c.open;
+      const prevBullish = prev.close > prev.open;
+      const prevBearish = prev.close < prev.open;
+
+      if (isBullish && prevBearish && c.open <= prev.close && c.close >= prev.open && body >= prevBody * 0.9) {
+        results.push({ time: c.time, price: c.low, pattern: 'Bullish Engulfing', signal: 'Long' });
+      } else if (isBearish && prevBullish && c.open >= prev.close && c.close <= prev.open && body >= prevBody * 0.9) {
+        results.push({ time: c.time, price: c.high, pattern: 'Bearish Engulfing', signal: 'Short' });
+      } else if (lowerWick >= body * 2 && upperWick <= range * 0.15 && body <= range * 0.4) {
+        // ไส้ล่างยาว ไส้บนแทบไม่มี ตัวเทียนเล็ก -> Hammer (สัญญาณกลับตัวขาขึ้น)
+        results.push({ time: c.time, price: c.low, pattern: 'Hammer', signal: 'Long' });
+      } else if (upperWick >= body * 2 && lowerWick <= range * 0.15 && body <= range * 0.4) {
+        // ไส้บนยาว ไส้ล่างแทบไม่มี ตัวเทียนเล็ก -> Shooting Star (สัญญาณกลับตัวขาลง)
+        results.push({ time: c.time, price: c.high, pattern: 'Shooting Star', signal: 'Short' });
+      } else if (body <= range * 0.08) {
+        // ตัวเทียนเล็กมาก ไส้สองข้างใกล้เคียงกัน -> Doji (ไม่ชัดเจน รอสัญญาณยืนยัน)
+        results.push({ time: c.time, price: c.high, pattern: 'Doji', signal: 'Neutral' });
+      }
+    }
+    return results.slice(-6); // จำกัดจำนวนไม่ให้กราฟรก เอาแค่ 6 อันล่าสุด
+  }
+
   let trendLineSeries = [];
   let activePriceLines = [];
 
@@ -562,13 +603,26 @@
     const recent = swings.slice(-12); // เอาแค่จุดล่าสุด ไม่ให้กราฟรกเกินไป
 
     // จุดสวิง HH/HL/LH/LL
-    const markers = recent.map((p) => ({
+    const swingMarkers = recent.map((p) => ({
       time: p.time,
       position: p.kind === 'high' ? 'aboveBar' : 'belowBar',
       color: (p.label === 'HH' || p.label === 'HL') ? '#0ca30c' : (p.label === 'LH' || p.label === 'LL') ? '#d03b3b' : '#c3c2b7',
       shape: p.kind === 'high' ? 'arrowDown' : 'arrowUp',
       text: `${p.label} ${p.price.toFixed(2)}`,
     }));
+
+    // แพทเทิลแท่งเทียน -> สัญญาณ Long/Short/Neutral
+    const patterns = detectCandlePatterns(data);
+    const patternMarkers = patterns.map((p) => ({
+      time: p.time,
+      position: p.signal === 'Short' ? 'aboveBar' : p.signal === 'Long' ? 'belowBar' : 'inBar',
+      color: p.signal === 'Long' ? '#0ca30c' : p.signal === 'Short' ? '#d03b3b' : '#fab219',
+      shape: p.signal === 'Long' ? 'arrowUp' : p.signal === 'Short' ? 'arrowDown' : 'circle',
+      text: `${p.pattern}${p.signal !== 'Neutral' ? ' → ' + p.signal : ''}`,
+    }));
+
+    // รวม marker ทั้งหมดเป็นชุดเดียว (lightweight-charts รับได้ทีละชุดต่อ series เท่านั้น) เรียงตามเวลา
+    const markers = [...swingMarkers, ...patternMarkers].sort((a, b) => a.time - b.time);
     series.setMarkers(markers);
 
     // เส้นแนวโน้ม: ลากผ่านจุดต่ำสุด 2 จุดล่าสุด (แนวรับที่เอียง) และจุดสูงสุด 2 จุดล่าสุด (แนวต้านที่เอียง)
