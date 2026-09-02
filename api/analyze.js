@@ -276,7 +276,7 @@ async function analyzeWithClaude(candlesByTf, indicatorsByTf) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 15000,
+      max_tokens: 50000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userContent }],
     }),
