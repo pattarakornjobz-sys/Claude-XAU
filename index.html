@@ -575,27 +575,28 @@ function renderSplits(seed) {
   const tps = Array.isArray(src.take_profit) ? src.take_profit.filter(Boolean) : [];
   const eq = +(100 / n).toFixed(2);
   const lbl = calcMode === 'lot' ? 'Lot' : '% เสี่ยง';
+  const stepAttr = calcMode === 'lot' ? '0.01' : '0.1';
 
   let html = '';
-  for (let i = 0; i < n; i++) {
-    const ev = pe[i] || e0 || '';
-    const sv = ps[i] || s0 || '';
-    const tv = pt[i] || firstNum(tps[i]) || firstNum(tps[tps.length - 1]) || '';
-    const lv = pl[i] || (calcMode === 'lot' ? '0.01' : (i === n - 1 ? (100 - eq * (n - 1)).toFixed(2) : eq));
-    html += `<div class="split">
-      <div class="idx">ไม้ที่ ${i + 1}</div>
-      <div class="in">
-        <div class="field s-entry"><label>Entry</label><input type="number" step="0.01" inputmode="decimal" value="${ev}" /></div>
-        <div class="field s-sl"><label>Stop Loss</label><input type="number" step="0.01" inputmode="decimal" value="${sv}" /></div>
-        <div class="field s-tp"><label>Take Profit</label><input type="number" step="0.01" inputmode="decimal" value="${tv}" /></div>
-        <div class="field s-last"><label>${lbl}</label><input type="number" step="${calcMode === 'lot' ? '0.01' : '0.1'}" min="0" inputmode="decimal" value="${lv}" /></div>
-      </div>
-      <div class="outs">
-        <div class="o-risk"><div class="k">เสี่ยงไม้นี้</div><div class="v">-</div></div>
-        <div class="o-rew"><div class="k">กำไรถ้าชน TP</div><div class="v">-</div></div>
-        <div class="o-rr"><div class="k">R:R ไม้นี้</div><div class="v">-</div></div>
-      </div>
-    </div>`;
+  for (let k = 0; k < n; k++) {
+    const ev = pe[k] || e0 || '';
+    const sv = ps[k] || s0 || '';
+    const tv = pt[k] || firstNum(tps[k]) || firstNum(tps[tps.length - 1]) || '';
+    const lv = pl[k] || (calcMode === 'lot' ? '0.01' : (k === n - 1 ? (100 - eq * (n - 1)).toFixed(2) : eq));
+    html += '<div class="split">' +
+      '<div class="idx">ไม้ที่ ' + (k + 1) + '</div>' +
+      '<div class="in">' +
+        '<div class="field s-entry"><label>Entry</label><input type="number" step="0.01" inputmode="decimal" value="' + ev + '" /></div>' +
+        '<div class="field s-sl"><label>Stop Loss</label><input type="number" step="0.01" inputmode="decimal" value="' + sv + '" /></div>' +
+        '<div class="field s-tp"><label>Take Profit</label><input type="number" step="0.01" inputmode="decimal" value="' + tv + '" /></div>' +
+        '<div class="field s-last"><label>' + lbl + '</label><input type="number" step="' + stepAttr + '" min="0" inputmode="decimal" value="' + lv + '" /></div>' +
+      '</div>' +
+      '<div class="outs">' +
+        '<div class="o-risk"><div class="k">เสี่ยงไม้นี้</div><div class="v">-</div></div>' +
+        '<div class="o-rew"><div class="k">กำไรถ้าชน TP</div><div class="v">-</div></div>' +
+        '<div class="o-rr"><div class="k">R:R ไม้นี้</div><div class="v">-</div></div>' +
+      '</div>' +
+    '</div>';
   }
   box.innerHTML = html;
   box.querySelectorAll('input').forEach(el => el.addEventListener('input', calc));
@@ -604,10 +605,10 @@ function renderSplits(seed) {
 
 function calc() {
   const bal = num($('#cBal').value);
-  const rows_ = [...document.querySelectorAll('#splitRows .split')];
+  const list = [...document.querySelectorAll('#splitRows .split')];
   let tRisk = 0, tRew = 0, tLot = 0, wEntry = 0, belowMin = false, incomplete = false;
 
-  rows_.forEach(r => {
+  list.forEach(r => {
     const entry = num(r.querySelector('.s-entry input').value);
     const sl = num(r.querySelector('.s-sl input').value);
     const tp = num(r.querySelector('.s-tp input').value);
@@ -624,250 +625,30 @@ function calc() {
 
     tRisk += risk; tLot += lot; wEntry += entry * lot;
     if (lot > 0 && lot < 0.01) belowMin = true;
-    oR.textContent = '/* ---------- history ---------- */
-function renderHistory() {
-  const list = rows.slice(1, 8);
-  $('#histCard').style.display = list.length ? 'flex' : 'none';
-  $('#histList').innerHTML = list.map(r => {
-    const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
-    return `<div class="hist"><span>${esc(t)}</span><span class="p">$${fmt(num(r.price_snapshot))}</span>${badge(r.bias, true)}</div>`;
-  }).join('');
-}
-
-/* ---------- pwa + refresh ---------- */
-if ('serviceWorker' in navigator) {
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return; reloading = true; location.reload();
-  });
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      const offer = sw => {
-        if (!sw) return;
-        $('#upd').style.display = 'flex';
-        $('#updBtn').onclick = () => { $('#updBtn').textContent = 'กำลังอัปเดต...'; sw.postMessage('skipWaiting'); };
-      };
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) offer(sw);
-        });
-      });
-      const poll = () => reg.update().catch(() => {});
-      setInterval(poll, 60000);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-    } catch (e) {}
-  });
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(load, 5 * 60 * 1000);
-load();
-</script>
-</body>
-</html>
- + fmt(risk);
+    oR.textContent = '$' + fmt(risk);
     if (tp != null && tp !== entry) {
       const rew = lot * 100 * Math.abs(tp - entry);
       tRew += rew;
-      oW.textContent = '/* ---------- history ---------- */
-function renderHistory() {
-  const list = rows.slice(1, 8);
-  $('#histCard').style.display = list.length ? 'flex' : 'none';
-  $('#histList').innerHTML = list.map(r => {
-    const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
-    return `<div class="hist"><span>${esc(t)}</span><span class="p">$${fmt(num(r.price_snapshot))}</span>${badge(r.bias, true)}</div>`;
-  }).join('');
-}
-
-/* ---------- pwa + refresh ---------- */
-if ('serviceWorker' in navigator) {
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return; reloading = true; location.reload();
-  });
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      const offer = sw => {
-        if (!sw) return;
-        $('#upd').style.display = 'flex';
-        $('#updBtn').onclick = () => { $('#updBtn').textContent = 'กำลังอัปเดต...'; sw.postMessage('skipWaiting'); };
-      };
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) offer(sw);
-        });
-      });
-      const poll = () => reg.update().catch(() => {});
-      setInterval(poll, 60000);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-    } catch (e) {}
-  });
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(load, 5 * 60 * 1000);
-load();
-</script>
-</body>
-</html>
- + fmt(rew);
+      oW.textContent = '$' + fmt(rew);
       oRR.textContent = '1 : ' + fmt(rew / risk);
     } else { oW.textContent = '-'; oRR.textContent = '-'; }
   });
 
   const lotTxt = tLot > 0 ? (tLot < 0.01 ? fmt(tLot, 4) : fmt(tLot)) + ' lot' : '-';
   const items = [
-    ['เสี่ยงรวมเป็นเงิน', tRisk > 0 ? '/* ---------- history ---------- */
-function renderHistory() {
-  const list = rows.slice(1, 8);
-  $('#histCard').style.display = list.length ? 'flex' : 'none';
-  $('#histList').innerHTML = list.map(r => {
-    const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
-    return `<div class="hist"><span>${esc(t)}</span><span class="p">$${fmt(num(r.price_snapshot))}</span>${badge(r.bias, true)}</div>`;
-  }).join('');
-}
-
-/* ---------- pwa + refresh ---------- */
-if ('serviceWorker' in navigator) {
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return; reloading = true; location.reload();
-  });
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      const offer = sw => {
-        if (!sw) return;
-        $('#upd').style.display = 'flex';
-        $('#updBtn').onclick = () => { $('#updBtn').textContent = 'กำลังอัปเดต...'; sw.postMessage('skipWaiting'); };
-      };
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) offer(sw);
-        });
-      });
-      const poll = () => reg.update().catch(() => {});
-      setInterval(poll, 60000);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-    } catch (e) {}
-  });
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(load, 5 * 60 * 1000);
-load();
-</script>
-</body>
-</html>
- + fmt(tRisk) : '-'],
+    ['เสี่ยงรวมเป็นเงิน', tRisk > 0 ? '$' + fmt(tRisk) : '-'],
     ['LOT รวมทุกไม้', lotTxt],
-    ['กำไรรวมถ้าชน TP ครบ', tRew > 0 ? '/* ---------- history ---------- */
-function renderHistory() {
-  const list = rows.slice(1, 8);
-  $('#histCard').style.display = list.length ? 'flex' : 'none';
-  $('#histList').innerHTML = list.map(r => {
-    const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
-    return `<div class="hist"><span>${esc(t)}</span><span class="p">$${fmt(num(r.price_snapshot))}</span>${badge(r.bias, true)}</div>`;
-  }).join('');
-}
-
-/* ---------- pwa + refresh ---------- */
-if ('serviceWorker' in navigator) {
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return; reloading = true; location.reload();
-  });
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      const offer = sw => {
-        if (!sw) return;
-        $('#upd').style.display = 'flex';
-        $('#updBtn').onclick = () => { $('#updBtn').textContent = 'กำลังอัปเดต...'; sw.postMessage('skipWaiting'); };
-      };
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) offer(sw);
-        });
-      });
-      const poll = () => reg.update().catch(() => {});
-      setInterval(poll, 60000);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-    } catch (e) {}
-  });
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(load, 5 * 60 * 1000);
-load();
-</script>
-</body>
-</html>
- + fmt(tRew) : '-'],
+    ['กำไรรวมถ้าชน TP ครบ', tRew > 0 ? '$' + fmt(tRew) : '-'],
     ['R:R รวม (ถ่วงน้ำหนัก)', tRisk > 0 && tRew > 0 ? '1 : ' + fmt(tRew / tRisk) : '-'],
-    ['ENTRY เฉลี่ย', tLot > 0 ? '/* ---------- history ---------- */
-function renderHistory() {
-  const list = rows.slice(1, 8);
-  $('#histCard').style.display = list.length ? 'flex' : 'none';
-  $('#histList').innerHTML = list.map(r => {
-    const t = new Date(r.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
-    return `<div class="hist"><span>${esc(t)}</span><span class="p">$${fmt(num(r.price_snapshot))}</span>${badge(r.bias, true)}</div>`;
-  }).join('');
-}
-
-/* ---------- pwa + refresh ---------- */
-if ('serviceWorker' in navigator) {
-  let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return; reloading = true; location.reload();
-  });
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      const offer = sw => {
-        if (!sw) return;
-        $('#upd').style.display = 'flex';
-        $('#updBtn').onclick = () => { $('#updBtn').textContent = 'กำลังอัปเดต...'; sw.postMessage('skipWaiting'); };
-      };
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) offer(sw);
-        });
-      });
-      const poll = () => reg.update().catch(() => {});
-      setInterval(poll, 60000);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-    } catch (e) {}
-  });
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(load, 5 * 60 * 1000);
-load();
-</script>
-</body>
-</html>
- + fmt(wEntry / tLot) : '-'],
+    ['ENTRY เฉลี่ย', tLot > 0 ? '$' + fmt(wEntry / tLot) : '-'],
     ['% ต่อพอร์ต', bal ? fmt(tRisk / bal * 100, 2) + '%' : '-']
   ];
-  $('#calcOut').innerHTML = items.map(([k, v]) => `<div><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  $('#calcOut').innerHTML = items.map(pair => '<div><span class="k">' + pair[0] + '</span><span class="v">' + pair[1] + '</span></div>').join('');
 
   const w = [];
   if (calcMode === 'risk' && bal == null) w.push('⚠️ ต้องกรอกทุนในบัญชีก่อน ถึงจะคำนวณจาก % ความเสี่ยงได้');
   if (incomplete) w.push('⚠️ บางไม้ยังกรอกไม่ครบ (Entry / SL ต้องไม่เท่ากัน และต้องกรอก' + (calcMode === 'lot' ? ' Lot' : ' % เสี่ยง') + ' ด้วย)');
-  if (belowMin) w.push('⚠️ บางไม้คำนวณได้ต่ำกว่า 0.01 lot ซึ่งเป็นขนาดขั้นต่ำที่โบรกเกอร์ส่วนใหญ่กำหนด — ลองลดจำนวนไม้ ลด SL ให้แคบลง หรือเพิ่ม % เสี่ยง');
+  if (belowMin) w.push('⚠️ บางไม้คำนวณได้ต่ำกว่า 0.01 lot ซึ่งเป็นขนาดขั้นต่ำของโบรกเกอร์ส่วนใหญ่ — ลองลดจำนวนไม้ ลด SL ให้แคบลง หรือเพิ่ม % เสี่ยง');
   const warn = $('#calcWarn');
   warn.style.display = w.length ? 'block' : 'none';
   warn.innerHTML = w.join('<br>');
