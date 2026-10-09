@@ -97,13 +97,15 @@
   .c2{color:var(--gold); font-weight:400}
   .g{color:var(--good)} .w{color:var(--warn)} .r{color:var(--crit)} .n{color:var(--ts)}
 
-  .tabs{display:flex; gap:6px}
+  .tabs{display:flex; gap:6px; flex-wrap:wrap}
   .tabs button{
-    flex:1; background:transparent; border:1px solid rgba(255,255,255,.12); color:var(--ts);
+    flex:1 1 auto; min-width:0; background:transparent; border:1px solid rgba(255,255,255,.12); color:var(--ts);
     font:600 12px var(--sans); padding:9px 4px; border-radius:9px; cursor:pointer; font-family:var(--sans);
   }
   .tabs.mono button{font-family:var(--mono); font-size:12.5px}
   .tabs button.on{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
+  #chartTabs button{flex:1 1 29%}
+  .primary-tag{font:600 8.5px var(--mono); color:var(--gold); background:rgba(212,175,55,.14); border:1px solid rgba(212,175,55,.35); border-radius:5px; padding:2px 6px; letter-spacing:.04em}
 
   #chart{height:250px; border-radius:8px; overflow:hidden}
   .legend{display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font:400 10px var(--sans); color:var(--tm)}
@@ -182,7 +184,7 @@
 <div id="upd"><span>มีเวอร์ชันใหม่พร้อมใช้งาน</span><button id="updBtn">อัปเดตเลย</button></div>
 
 <header>
-  <div class="brand"><b>XAUUSD</b><span>GOLD SPOT · 4H / 1H / 15M</span></div>
+  <div class="brand"><b>XAUUSD</b><span>GOLD SPOT · D·4H·1H·30M·15M·5M · DAY TRADE</span></div>
   <div class="live" id="live"><i></i><span id="liveText">LOADING</span></div>
 </header>
 
@@ -194,9 +196,12 @@
 
   <section class="screen" id="s-chart">
     <div class="tabs mono" id="chartTabs">
+      <button data-tf="D">D</button>
       <button data-tf="4h">4H</button>
       <button data-tf="1h" class="on">1H</button>
+      <button data-tf="30m">30M</button>
       <button data-tf="15m">15M</button>
+      <button data-tf="5m">5M</button>
     </div>
     <div class="card" style="padding:14px 12px 10px">
       <div style="display:flex; justify-content:space-between; align-items:baseline; padding:0 2px 10px">
@@ -218,10 +223,6 @@
   </section>
 
   <section class="screen" id="s-plan">
-    <div class="tabs" id="planTabs">
-      <button data-mode="swing" class="on">ระยะยาว (Swing 4H)</button>
-      <button data-mode="short">ระยะสั้น (1H)</button>
-    </div>
     <div id="planBody"></div>
   </section>
 
@@ -262,9 +263,11 @@
 /* ---------- config ---------- */
 const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
-const TF_KEYS = ['4h','1h','15m'], TF_LABEL = {'4h':'4H','1h':'1H','15m':'15M'};
+const TF_KEYS = ['D','4h','1h','30m','15m','5m'], TF_LABEL = {'D':'D','4h':'4H','1h':'1H','30m':'30M','15m':'15M','5m':'5M'};
+const PRIMARY_TFS = ['1h','30m','15m']; // TF หลักที่ใช้ตัดสินใจเข้าไม้จริง (D/4H/5M เป็นบริบท)
+const CONFLUENCE_STRONG = 4, CONFLUENCE_MED = 2; // ตรงกัน >=4 จาก 6 TF = เด่นมาก, >=2 = เด่นปานกลาง
 
-let rows = [], row = null, activeTf = '1h', planMode = 'swing', chart = null, series = null, priceLines = [];
+let rows = [], row = null, activeTf = '1h', chart = null, series = null, priceLines = [];
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -293,12 +296,6 @@ $('#chartTabs').addEventListener('click', e => {
   document.querySelectorAll('#chartTabs button').forEach(x => x.classList.toggle('on', x === b));
   activeTf = b.dataset.tf; drawChart(); renderChartLevels();
 });
-$('#planTabs').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  document.querySelectorAll('#planTabs button').forEach(x => x.classList.toggle('on', x === b));
-  planMode = b.dataset.mode; renderPlan();
-});
-
 /* ---------- load ---------- */
 async function load() {
   try {
@@ -358,7 +355,7 @@ function collect() {
 function cls(price, cl, tol) {
   const c = cl.find(x => Math.abs(x.avg - price) <= tol);
   if (!c) return '';
-  return c.tfs.length >= 3 ? 'c3' : c.tfs.length === 2 ? 'c2' : '';
+  return c.tfs.length >= CONFLUENCE_STRONG ? 'c3' : c.tfs.length >= CONFLUENCE_MED ? 'c2' : '';
 }
 function levelList(arr, cl, tol) {
   if (!arr || !arr.length) return '-';
@@ -430,15 +427,17 @@ function renderOverview() {
     </div>` : ''}
 
     <div class="stack">
-      <span class="lbl">รายละเอียดแต่ละ TIMEFRAME</span>
+      <span class="lbl">รายละเอียดแต่ละ TIMEFRAME (D → 4H → 1H → 30M → 15M → 5M)</span>
       ${TF_KEYS.map(k => {
         const d = tfs[k]; if (!d) return '';
         const i = inds[k] || {};
         const rk = i.rsiStatus === 'Overbought' ? 'r' : i.rsiStatus === 'Oversold' ? 'g' : 'n';
         const mk = i.macdStatus === 'Bullish' ? 'g' : i.macdStatus === 'Bearish' ? 'r' : 'n';
+        const sk = i.stochSignal === 'Buy' ? 'g' : i.stochSignal === 'Sell' ? 'r' : 'n';
+        const isPrimary = PRIMARY_TFS.includes(k);
         return `
         <div class="tfc">
-          <div class="h"><span class="n">${TF_LABEL[k]}</span>${badge(d.bias, true)}</div>
+          <div class="h"><span class="n">${TF_LABEL[k]}</span>${isPrimary ? '<span class="primary-tag">TF หลัก</span>' : ''}${badge(d.bias, true)}</div>
           <div class="t">เทรนด์: ${esc(d.trend) || '-'}</div>
           <div class="note">${esc(d.structure_note) || '-'}</div>
           ${d.smc_zones ? `<div class="smc">SMC: ${esc(d.smc_zones)}</div>` : ''}
@@ -449,6 +448,7 @@ function renderOverview() {
           <div class="ind">
             <span>RSI <b class="${rk}">${i.rsi14 != null ? esc(i.rsi14) : '-'}</b></span>
             <span>MACD <b class="${mk}">${esc(i.macdStatus || 'Neutral')}</b></span>
+            <span>Stoch <b class="${sk}">${i.stochK != null ? esc(i.stochK) + '/' + esc(i.stochD) : '-'}${i.stochSignal ? ' ' + esc(i.stochSignal) : ''}</b></span>
             <span>EMA50 <b class="n">${i.ema50 != null ? esc(i.ema50) : '-'}</b></span>
           </div>
         </div>`;
@@ -456,9 +456,9 @@ function renderOverview() {
     </div>
 
     <div class="fine" style="margin-bottom:2px">
-      <span class="c3">ตัวหนาสีทอง</span> = ตรงกันทั้ง 3 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน 2 timeframe
+      <span class="c3">ตัวหนาสีทอง</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe · <span class="primary-tag" style="padding:1px 5px">TF หลัก</span> = ใช้ตัดสินเข้าไม้จริง (15M/30M/1H)
     </div>
-    <div class="disc">⚠️ สรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุน ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ</div>
+    <div class="disc">⚠️ สรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุน เน้นฝั่ง Buy เป็นหลัก เทรดจบภายในวันเดียว ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ</div>
   `;
 }
 
@@ -511,24 +511,44 @@ function renderChartLevels() {
   `;
 }
 
-/* ---------- plan ---------- */
+/* ---------- plan (แผนเดียว/วัน จบในวัน ไม่ถือข้ามคืน) ---------- */
+function cascadeRow(label, info) {
+  if (!info) return `<div class="hist"><span>${esc(label)}</span><span class="p">ยังไม่มีจุดหักที่สด</span></div>`;
+  const dirTh = info.direction === 'bullish' ? 'ขาขึ้น (Bullish)' : 'ขาลง (Bearish)';
+  return `<div class="hist"><span>${esc(label)}</span><span class="p">${esc(dirTh)} @ ${fmt(info.price)}</span></div>`;
+}
+
 function renderPlan() {
   if (!row) return;
-  const ti = (planMode === 'short' ? row.trade_idea_short_json : row.trade_idea_json) || {};
+  const ti = row.trade_idea_json || {};
+  const casc = ti.cascade || {};
   const has = ti.entry_zone && ti.entry_zone !== '-';
   const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
   const el = $('#planBody');
 
+  const statusCard = `
+    <div class="card stack" style="gap:2px">
+      <span class="lbl" style="margin-bottom:6px">สถานะคอนเฟิร์มเข้าไม้ (15M + 30M + Stochastic)</span>
+      <div class="fine" style="margin-bottom:8px">${esc(row.setup_status) || '-'}</div>
+      ${cascadeRow('15M จุดหักล่าสุด', casc.tf15)}
+      ${cascadeRow('30M จุดหักล่าสุด', casc.tf30)}
+      <div class="hist"><span>Stochastic 15M</span><span class="p">${esc(casc.stoch15) || 'ยังไม่ตัดกันในโซน'}</span></div>
+      <div class="hist"><span>1H เทรนด์ (soft check)</span><span class="p">${esc(casc.tf1h_soft) || '-'}</span></div>
+    </div>`;
+
   if (!has) {
-    el.innerHTML = `<div class="card"><div class="fine">โครงสร้าง ${planMode === 'short' ? '1H' : '4H'} ตอนนี้ยังไม่ชัดเจนพอจะเสนอแผน${planMode === 'short' ? 'ระยะสั้น' : 'ระยะยาว'} — ลองดูอีกแผน หรือรอรอบวิเคราะห์ถัดไป</div></div>`;
+    el.innerHTML = `
+      <div class="card"><div class="fine">ยังไม่ครบเงื่อนไขเข้าไม้วันนี้ — ต้องมี "จุดหัก" (ปลายแหลม) ทิศเดียวกันทั้ง 15M และ 30M พร้อม Stochastic 15M ยืนยันโซนกลับตัว ถ้ายังไม่ครบ ระบบจะไม่เสนอ Entry/SL/TP ให้ (ป้องกันเข้าไม้มั่วแล้วโดน SL รัว) ลองรอรอบวิเคราะห์ถัดไป หรือแวะมาเช็คอีกครั้ง</div></div>
+      ${statusCard}
+    `;
     return;
   }
   const dir = biasCls(ti.direction || row.bias);
   el.innerHTML = `
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
-        <span class="lbl">แนวคิดแผนเทรด</span>
-        ${badge(dir + ' · ' + (planMode === 'short' ? '1H' : '4H'), true).replace('b-Wait','b-'+dir)}
+        <span class="lbl">แผนเทรดวันนี้ (จบในวัน ไม่ถือข้ามคืน)</span>
+        ${badge(dir, true).replace('b-Wait','b-'+dir)}
       </div>
       <div class="grid2">
         <div class="stat"><div class="k">ENTRY ZONE</div><div class="v" style="color:var(--gold)">${esc(ti.entry_zone)}</div></div>
@@ -536,9 +556,10 @@ function renderPlan() {
         <div class="stat"><div class="k">TAKE PROFIT</div><div class="v" style="color:var(--good)">${esc(tp.join(' / ')) || '-'}</div></div>
         <div class="stat"><div class="k">R:R</div><div class="v">${esc(ti.rr_ratio) || '-'}</div></div>
       </div>
-      <div class="fine" style="margin-top:12px">${esc(ti.note) || 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง'}</div>
+      <div class="fine" style="margin-top:12px">${esc(ti.note) || 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง และปิดไม้ภายในวันนี้'}</div>
       <button id="usePlan" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
     </div>
+    ${statusCard}
   `;
   $('#usePlan').onclick = () => {
     if (tp.length) $('#cSplits').value = Math.min(6, Math.max(1, tp.length));
