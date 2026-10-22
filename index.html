@@ -264,7 +264,7 @@
 const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
 const TF_KEYS = ['D','4h','1h','30m','15m','5m'], TF_LABEL = {'D':'D','4h':'4H','1h':'1H','30m':'30M','15m':'15M','5m':'5M'};
-const PRIMARY_TFS = ['1h','30m','15m']; // TF หลักที่ใช้ตัดสินใจเข้าไม้จริง (D/4H/5M เป็นบริบท)
+const PRIMARY_TFS = ['4h','1h','15m','5m']; // TF ที่ใช้ในคู่เข้าไม้จริง: คู่ A=4H↔15M, คู่ B=1H↔5M (D/30M เป็นบริบท)
 const CONFLUENCE_STRONG = 4, CONFLUENCE_MED = 2; // ตรงกัน >=4 จาก 6 TF = เด่นมาก, >=2 = เด่นปานกลาง
 
 let rows = [], row = null, activeTf = '1h', chart = null, series = null, priceLines = [];
@@ -456,7 +456,7 @@ function renderOverview() {
     </div>
 
     <div class="fine" style="margin-bottom:2px">
-      <span class="c3">ตัวหนาสีทอง</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe · <span class="primary-tag" style="padding:1px 5px">TF หลัก</span> = ใช้ตัดสินเข้าไม้จริง (15M/30M/1H)
+      <span class="c3">ตัวหนาสีทอง</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe · <span class="primary-tag" style="padding:1px 5px">TF หลัก</span> = ใช้ในคู่เข้าไม้จริง (4H↔15M / 1H↔5M)
     </div>
     <div class="disc">⚠️ สรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุน เน้นฝั่ง Buy เป็นหลัก เทรดจบภายในวันเดียว ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ</div>
   `;
@@ -511,61 +511,83 @@ function renderChartLevels() {
   `;
 }
 
-/* ---------- plan (แผนเดียว/วัน จบในวัน ไม่ถือข้ามคืน) ---------- */
-function cascadeRow(label, info) {
+/* ---------- plan — 2 แผนคู่อิสระกัน: คู่ A (4H↔15M) และ คู่ B (1H↔5M), จบในวัน ไม่ถือข้ามคืน ---------- */
+function detailRow(label, info) {
   if (!info) return `<div class="hist"><span>${esc(label)}</span><span class="p">ยังไม่มีจุดหักที่สด</span></div>`;
   const dirTh = info.direction === 'bullish' ? 'ขาขึ้น (Bullish)' : 'ขาลง (Bearish)';
   return `<div class="hist"><span>${esc(label)}</span><span class="p">${esc(dirTh)} @ ${fmt(info.price)}</span></div>`;
 }
 
-function renderPlan() {
-  if (!row) return;
-  const ti = row.trade_idea_json || {};
-  const casc = ti.cascade || {};
-  const has = ti.entry_zone && ti.entry_zone !== '-';
-  const tp = Array.isArray(ti.take_profit) ? ti.take_profit.filter(Boolean) : [];
-  const el = $('#planBody');
+function planCard(title, plan, idSuffix) {
+  plan = plan || {};
+  const has = plan.entry_zone && plan.entry_zone !== '-';
+  const tp = Array.isArray(plan.take_profit) ? plan.take_profit.filter(Boolean) : [];
+  const d = plan.detail || {};
 
-  const statusCard = `
-    <div class="card stack" style="gap:2px">
-      <span class="lbl" style="margin-bottom:6px">สถานะคอนเฟิร์มเข้าไม้ (15M + 30M + Stochastic)</span>
-      <div class="fine" style="margin-bottom:8px">${esc(row.setup_status) || '-'}</div>
-      ${cascadeRow('15M จุดหักล่าสุด', casc.tf15)}
-      ${cascadeRow('30M จุดหักล่าสุด', casc.tf30)}
-      <div class="hist"><span>Stochastic 15M</span><span class="p">${esc(casc.stoch15) || 'ยังไม่ตัดกันในโซน'}</span></div>
-      <div class="hist"><span>1H เทรนด์ (soft check)</span><span class="p">${esc(casc.tf1h_soft) || '-'}</span></div>
+  const detailCard = `
+    <div class="card stack" style="gap:2px; margin-top:9px">
+      <span class="lbl" style="margin-bottom:6px">สถานะคอนเฟิร์ม (${esc(plan.pair) || '-'})</span>
+      <div class="fine" style="margin-bottom:8px">${esc(plan.status_text) || '-'}</div>
+      ${detailRow('จุดหัก TF เล็กล่าสุด', d.latestReversal)}
+      <div class="hist"><span>เทรนด์ TF ใหญ่</span><span class="p">${esc(d.trendBig) || '-'}</span></div>
+      <div class="hist"><span>Stochastic TF เล็ก</span><span class="p">${esc(d.stochSignal) || 'ยังไม่ตัดกันในโซน'}</span></div>
     </div>`;
 
   if (!has) {
-    el.innerHTML = `
-      <div class="card"><div class="fine">ยังไม่ครบเงื่อนไขเข้าไม้วันนี้ — ต้องมี "จุดหัก" (ปลายแหลม) ทิศเดียวกันทั้ง 15M และ 30M พร้อม Stochastic 15M ยืนยันโซนกลับตัว ถ้ายังไม่ครบ ระบบจะไม่เสนอ Entry/SL/TP ให้ (ป้องกันเข้าไม้มั่วแล้วโดน SL รัว) ลองรอรอบวิเคราะห์ถัดไป หรือแวะมาเช็คอีกครั้ง</div></div>
-      ${statusCard}
+    return `
+      <div class="card">
+        <span class="lbl">${esc(title)}</span>
+        <div class="fine" style="margin-top:8px">ยังไม่ครบเงื่อนไขเข้าไม้คู่นี้ — ต้องให้เทรนด์ TF ใหญ่ตรงทิศกับ "จุดหัก" (ปลายแหลม) ของ TF เล็ก พร้อม Stochastic ยืนยันโซนกลับตัว ถ้ายังไม่ครบ ระบบจะไม่เสนอ Entry/SL/TP ให้ (ป้องกันเข้าไม้มั่วแล้วโดน SL รัว)</div>
+      </div>
+      ${detailCard}
     `;
-    return;
   }
-  const dir = biasCls(ti.direction || row.bias);
-  el.innerHTML = `
+  const dir = biasCls(plan.direction);
+  return `
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
-        <span class="lbl">แผนเทรดวันนี้ (จบในวัน ไม่ถือข้ามคืน)</span>
+        <span class="lbl">${esc(title)}</span>
         ${badge(dir, true).replace('b-Wait','b-'+dir)}
       </div>
       <div class="grid2">
-        <div class="stat"><div class="k">ENTRY ZONE</div><div class="v" style="color:var(--gold)">${esc(ti.entry_zone)}</div></div>
-        <div class="stat"><div class="k">STOP LOSS</div><div class="v" style="color:var(--crit)">${esc(ti.stop_loss) || '-'}</div></div>
+        <div class="stat"><div class="k">ENTRY ZONE</div><div class="v" style="color:var(--gold)">${esc(plan.entry_zone)}</div></div>
+        <div class="stat"><div class="k">STOP LOSS</div><div class="v" style="color:var(--crit)">${esc(plan.stop_loss) || '-'}</div></div>
         <div class="stat"><div class="k">TAKE PROFIT</div><div class="v" style="color:var(--good)">${esc(tp.join(' / ')) || '-'}</div></div>
-        <div class="stat"><div class="k">R:R</div><div class="v">${esc(ti.rr_ratio) || '-'}</div></div>
+        <div class="stat"><div class="k">R:R</div><div class="v">${esc(plan.rr_ratio) || '-'}</div></div>
       </div>
-      <div class="fine" style="margin-top:12px">${esc(ti.note) || 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง และปิดไม้ภายในวันนี้'}</div>
-      <button id="usePlan" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
+      <div class="fine" style="margin-top:12px">${esc(plan.note) || 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง และปิดไม้ภายในวันนี้'}</div>
+      <button id="usePlan${idSuffix}" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
     </div>
-    ${statusCard}
+    ${detailCard}
   `;
-  $('#usePlan').onclick = () => {
+}
+
+function wireUsePlanButton(idSuffix, plan) {
+  const btn = document.getElementById('usePlan' + idSuffix);
+  if (!btn) return;
+  const tp = Array.isArray(plan.take_profit) ? plan.take_profit.filter(Boolean) : [];
+  btn.onclick = () => {
     if (tp.length) $('#cSplits').value = Math.min(6, Math.max(1, tp.length));
-    renderSplits({ entry_zone: ti.entry_zone, stop_loss: ti.stop_loss, take_profit: tp });
+    renderSplits({ entry_zone: plan.entry_zone, stop_loss: plan.stop_loss, take_profit: tp });
     document.querySelector('#nav button[data-tab="calc"]').click();
   };
+}
+
+function renderPlan() {
+  if (!row) return;
+  const ti = row.trade_idea_json || {};
+  const planA = ti.plan_4h_15m || {};
+  const planB = ti.plan_1h_5m || {};
+  const el = $('#planBody');
+
+  el.innerHTML = `
+    <div class="stack" style="gap:14px">
+      ${planCard('คู่ A: เทรนด์ 4H → เข้าไม้ 15M', planA, 'A')}
+      ${planCard('คู่ B: เทรนด์ 1H → เข้าไม้ 5M (สแคลป์ไวกว่า)', planB, 'B')}
+    </div>
+  `;
+  wireUsePlanButton('A', planA);
+  wireUsePlanButton('B', planB);
 }
 
 /* ---------- calculator (แบ่งไม้) ---------- */
@@ -679,7 +701,12 @@ function calc() {
 }
 
 function prefillCalc() {
-  planIdea = row.trade_idea_json || {};
+  const ti = row.trade_idea_json || {};
+  const planA = ti.plan_4h_15m || {}, planB = ti.plan_1h_5m || {};
+  const hasA = planA.entry_zone && planA.entry_zone !== '-';
+  const hasB = planB.entry_zone && planB.entry_zone !== '-';
+  // เติมค่าเริ่มต้นจากแผนที่คอนเฟิร์มแล้ว (เลือกคู่ A ก่อนถ้ามีทั้งคู่) — ปุ่ม "ส่งตัวเลขนี้ไปหน้าคำนวณ" ในแต่ละการ์ดเลือกคู่ที่ต้องการเองได้เสมอ
+  planIdea = hasA ? planA : hasB ? planB : {};
   const bv = localStorage.getItem('xau_cBal'); if (bv) $('#cBal').value = bv;
   const sv = localStorage.getItem('xau_cSplits'); if (sv) $('#cSplits').value = sv;
   renderSplits();

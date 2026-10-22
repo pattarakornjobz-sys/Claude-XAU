@@ -18,18 +18,21 @@
 // หมายเหตุขอบเขต: ระบบนี้เป็นเครื่องมือ "วิเคราะห์แล้วแจ้งเตือน" เท่านั้น ไม่เชื่อมต่อบัญชีเทรดจริง
 // ไม่มีการส่งคำสั่งซื้อขายหรือปิดออเดอร์ใดๆ ทั้งสิ้น
 //
-// ===== ระบบใหม่ (day-trade only, buy-biased, cascade confirmation) =====
-// - วิเคราะห์ 6 timeframe แบบ top-down: D > 4H > 1H > 30M > 15M > 5M
+// ===== ระบบใหม่ (day-trade only, buy-biased, จับคู่ TF แยก 2 แผนอิสระ) =====
+// - วิเคราะห์ 6 timeframe แบบ top-down เพื่อบริบท/SMC: D > 4H > 1H > 30M > 15M > 5M
 // - เทรด "จบในวันเดียว" เท่านั้น ไม่มีแผนถือข้ามคืน/หลายวันอีกต่อไป
 // - Bias เริ่มต้นเน้น Long เป็นหลัก จะเสนอ Short ได้ก็ต่อเมื่อ trend ของ D และ 4H เป็น "Bearish" ชัดเจนทั้งคู่
 //   (คำนวณ trend แบบ deterministic จากการเรียง EMA20/50/200 ไม่ใช่ให้ AI ประเมินเอง กัน AI มองเทรนด์ผิด)
-// - TF หลักที่ใช้ "ตัดสินใจเข้าไม้" คือ 15M / 30M / 1H ส่วน D/4H/5M เป็นแค่บริบทประกอบ
+// - แผนเข้าไม้แยกเป็น "คู่ TF" อิสระกัน 2 คู่ แต่ละคู่มี Entry/SL/TP ของตัวเอง:
+//     คู่ A = 4H (เทรนด์ใหญ่) ↔ 15M (จุดเข้าไม้)
+//     คู่ B = 1H (เทรนด์ใหญ่) ↔ 5M (จุดเข้าไม้ ไวกว่า/สแคลป์)
+//   (30M เป็นแค่บริบทประกอบในแดชบอร์ด ไม่ได้ใช้เป็นเงื่อนไขเข้าไม้แล้ว)
 // - "จุดหัก" (จุดกลับตัวปลายแหลม) คำนวณแบบ deterministic จาก wick/body ของแท่งที่เป็นจุดสวิงจริง
 //   (ไม่ใช่ทุกจุดสวิงจะหัก - ต้องปลายแหลมเท่านั้น ถ้าไม่แหลมคือไม่หัก)
-// - เงื่อนไขเข้าไม้ (hard gate, บังคับด้วยโค้ดไม่ใช่แค่สั่ง AI): ต้องมี "จุดหัก" ทิศเดียวกันทั้ง 15M และ 30M
-//   (30M เริ่มหักก็นับ) + Stochastic ของ 15M ต้องตัดกันอยู่ในโซนกลับตัว (ต่ำกว่า 25 = ซื้อ / เหนือ 75 = ขาย)
-//   ทิศเดียวกับจุดหัก ถ้าไม่ครบเงื่อนไข ระบบจะล้างช่อง entry_zone/stop_loss/take_profit เป็น "-" เอง
-//   ไม่ว่า AI จะตอบว่าอย่างไร — 1H ใช้เป็นแค่ตัวเช็คทิศทางแบบ soft ประกอบการตัดสินใจเท่านั้น
+// - เงื่อนไขเข้าไม้ต่อคู่ (hard gate, บังคับด้วยโค้ดไม่ใช่แค่สั่ง AI): เทรนด์ของ TF ใหญ่ต้อง "ตรงทิศ" กับ
+//   จุดหักของ TF เล็ก + Stochastic ของ TF เล็กต้องตัดกันอยู่ในโซนกลับตัวตรงทิศทาง (ต่ำกว่า 25 = ซื้อ / เหนือ 75 = ขาย)
+//   ถ้า TF ใหญ่เป็น Sideway หรือทิศไม่ตรงกัน = ไม่คอนเฟิร์มเลย ระบบจะล้างช่อง entry_zone/stop_loss/take_profit
+//   ของคู่นั้นเป็น "-" เองไม่ว่า AI จะตอบว่าอย่างไร — คู่ A และคู่ B เป็นอิสระต่อกัน คู่หนึ่งคอนเฟิร์มได้โดยอีกคู่ยังไม่คอนเฟิร์มก็ได้
 
 const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://claude-xau.vercel.app/';
 
@@ -83,12 +86,12 @@ module.exports = async function handler(req, res) {
     const indicatorsByTf = {};
     Object.keys(candlesByTf).forEach((k) => (indicatorsByTf[k] = computeIndicators(candlesByTf[k])));
 
-    // คำนวณ cascade confirmation (จุดหัก 15M+30M + Stochastic) และ buy-bias gate (trend D+4H) แบบ deterministic
-    const cascade = buildCascade(candlesByTf, indicatorsByTf);
+    // คำนวณสัญญาณ 2 คู่ (4H↔15M, 1H↔5M: TF ใหญ่ยืนยันทิศ + จุดหัก/Stochastic ของ TF เล็ก) และ buy-bias gate (trend D+4H) แบบ deterministic
+    const pairSignals = buildPairSignals(candlesByTf, indicatorsByTf);
     const shortAllowed = indicatorsByTf['D'].trendClass === 'Bearish' && indicatorsByTf['4h'].trendClass === 'Bearish';
 
-    const analysis = await analyzeWithClaude(candlesByTf, indicatorsByTf, cascade, shortAllowed);
-    enforceHardGates(analysis, cascade, shortAllowed);
+    const analysis = await analyzeWithClaude(candlesByTf, indicatorsByTf, pairSignals, shortAllowed);
+    enforcePairGates(analysis, pairSignals, shortAllowed);
 
     const previous = await getLastAnalysis();
     await saveToSupabase(candlesByTf, indicatorsByTf, analysis);
@@ -98,7 +101,13 @@ module.exports = async function handler(req, res) {
       analysis.bias && analysis.bias !== 'Wait' && analysis.bias !== (previous && previous.bias);
     await notifyTelegram(analysis, previous, isNewSignal);
 
-    return res.status(200).json({ ok: true, bias: analysis.bias, entry_ready: cascade.confirmed, notified: true });
+    return res.status(200).json({
+      ok: true,
+      bias: analysis.bias,
+      pair_4h_15m_ready: pairSignals.pairA.confirmed,
+      pair_1h_5m_ready: pairSignals.pairB.confirmed,
+      notified: true,
+    });
   } catch (err) {
     console.error('analyze.js error:', err);
     return res.status(500).json({ ok: false, error: String(err && err.message ? err.message : err) });
@@ -362,84 +371,103 @@ function computeIndicators(candles) {
   };
 }
 
-// ---------- 2.5) Cascade confirmation: จุดหัก 15M+30M (hard gate) + Stochastic 15M + 1H (soft) ----------
-function buildCascade(candlesByTf, indicatorsByTf) {
-  const r15 = detectSharpReversals(candlesByTf['15m'], 2);
-  const r30 = detectSharpReversals(candlesByTf['30m'], 2);
-  const last15 = mostRecentWithin(r15, candlesByTf['15m'].length, 4);
-  const last30 = mostRecentWithin(r30, candlesByTf['30m'].length, 3);
+// ---------- 2.5) สัญญาณแบบจับคู่ TF: 4H↔15M (pair A) และ 1H↔5M (pair B) ----------
+// กติกาต่อคู่ (hard gate ทั้งคู่ ไม่ใช่แค่ TF เล็กอย่างเดียวเหมือนระบบเดิม):
+//   - เทรนด์ของ TF ใหญ่ (deterministic จาก EMA) ต้อง "ตรงทิศ" กับจุดหัก (ปลายแหลม) ของ TF เล็ก
+//   - Stochastic ของ TF เล็กต้องตัดกันในโซนกลับตัวที่ตรงทิศทางเดียวกันด้วย
+//   - ถ้า TF ใหญ่เป็น Sideway = ไม่คอนเฟิร์มเด็ดขาด (ไม่มีทิศให้ตรงด้วย)
+//   - คู่ไหนจะเสนอ Short ได้ ต้องผ่าน shortAllowed (D+4H Bearish ชัดเจนทั้งคู่) เพิ่มอีกชั้นด้วย (buy-bias skew เดิม)
+function buildPairSignal(candlesLTF, indicatorsLTF, trendBig, recencyBars) {
+  const reversals = detectSharpReversals(candlesLTF, 2);
+  const latest = mostRecentWithin(reversals, candlesLTF.length, recencyBars);
+  const stochSignal = indicatorsLTF ? indicatorsLTF.stochSignal : null; // 'Buy' | 'Sell' | null
 
-  const jutHakAligned = !!(last15 && last30 && last15.direction === last30.direction);
-  const stoch15 = indicatorsByTf['15m'] ? indicatorsByTf['15m'].stochSignal : null; // 'Buy'/'Sell'/null
-  const stochMatches =
-    jutHakAligned &&
-    stoch15 &&
-    ((last15.direction === 'bullish' && stoch15 === 'Buy') || (last15.direction === 'bearish' && stoch15 === 'Sell'));
-
-  const confirmed = !!(jutHakAligned && stochMatches);
-  const direction = jutHakAligned ? (last15.direction === 'bullish' ? 'Long' : 'Short') : null;
-  const dir1hSoft = indicatorsByTf['1h'] ? indicatorsByTf['1h'].trendClass : 'Sideway';
+  const bullMatch = trendBig === 'Bullish' && latest && latest.direction === 'bullish' && stochSignal === 'Buy';
+  const bearMatch = trendBig === 'Bearish' && latest && latest.direction === 'bearish' && stochSignal === 'Sell';
+  const confirmed = !!(bullMatch || bearMatch);
 
   return {
     confirmed,
-    direction,
-    jutHakAligned,
-    tf15: last15 ? { direction: last15.direction, price: last15.price, time: last15.time } : null,
-    tf30: last30 ? { direction: last30.direction, price: last30.price, time: last30.time } : null,
-    stoch15,
-    stochMatches: !!stochMatches,
-    tf1h_soft: dir1hSoft,
+    direction: confirmed ? (bullMatch ? 'Long' : 'Short') : null,
+    trendBig,
+    latestReversal: latest ? { direction: latest.direction, price: latest.price, time: latest.time } : null,
+    stochSignal,
   };
 }
 
-function cascadeStatusText(cascade) {
-  if (cascade.confirmed) {
-    return `คอนเฟิร์มครบ: จุดหัก 15M+30M ตรงกัน (${cascade.direction}) + Stochastic 15M ยืนยันโซนกลับตัวแล้ว · 1H เอียงไปทาง ${cascade.tf1h_soft}`;
-  }
-  if (cascade.jutHakAligned && !cascade.stochMatches) {
-    return `จุดหัก 15M+30M ตรงกันแล้ว (${cascade.direction}) แต่ Stochastic 15M ยังไม่ยืนยันโซนกลับตัว — รอก่อน`;
-  }
-  if (cascade.tf15 && !cascade.tf30) {
-    return `15M มีจุดหัก (${cascade.tf15.direction}) แล้ว แต่ 30M ยังไม่หักตาม — ยังไม่เข้า`;
-  }
-  if (!cascade.tf15) {
-    return '15M ยังไม่เกิดจุดหักที่ชัดเจน (ปลายยังไม่แหลม) — รอสัญญาณ';
-  }
-  return 'ยังไม่ครบเงื่อนไขคอนเฟิร์มสำหรับเข้าไม้';
+function buildPairSignals(candlesByTf, indicatorsByTf) {
+  // Pair A: 4H (เทรนด์ใหญ่) ↔ 15M (จุดเข้าไม้) — recency 4 แท่ง 15M (~1 ชม.)
+  const pairA = buildPairSignal(candlesByTf['15m'], indicatorsByTf['15m'], indicatorsByTf['4h'].trendClass, 4);
+  // Pair B: 1H (เทรนด์ใหญ่) ↔ 5M (จุดเข้าไม้) — recency 6 แท่ง 5M (~30 นาที, ไวกว่าเพราะ 5M เป็นสแคลป์)
+  const pairB = buildPairSignal(candlesByTf['5m'], indicatorsByTf['5m'], indicatorsByTf['1h'].trendClass, 6);
+  return { pairA, pairB };
 }
 
-// บังคับ hard gate ด้วยโค้ด ไม่ไว้ใจแค่คำสั่งใน prompt — ล้างช่องเข้าไม้ถ้าเงื่อนไขยังไม่ครบ
-function enforceHardGates(analysis, cascade, shortAllowed) {
-  analysis.trade_idea = analysis.trade_idea || {};
-  analysis.trade_idea.cascade = {
-    confirmed: cascade.confirmed,
-    direction: cascade.direction,
-    tf15: cascade.tf15,
-    tf30: cascade.tf30,
-    stoch15: cascade.stoch15,
-    tf1h_soft: cascade.tf1h_soft,
+function pairStatusText(pair, bigLabel, smallLabel) {
+  if (pair.confirmed) {
+    return `คอนเฟิร์ม: เทรนด์ ${bigLabel} (${pair.trendBig}) ตรงกับจุดหัก + Stochastic ของ ${smallLabel} แล้ว`;
+  }
+  if (!pair.latestReversal) {
+    return `${smallLabel} ยังไม่เกิดจุดหักที่ชัดเจน (ปลายยังไม่แหลม) — รอสัญญาณ`;
+  }
+  if (pair.trendBig === 'Sideway') {
+    return `${smallLabel} มีจุดหัก (${pair.latestReversal.direction}) แล้ว แต่ ${bigLabel} ยัง Sideway อยู่ — ไม่คอนเฟิร์ม`;
+  }
+  const bigDirWord = pair.trendBig === 'Bullish' ? 'bullish' : 'bearish';
+  if (pair.latestReversal.direction !== bigDirWord) {
+    return `${smallLabel} มีจุดหัก (${pair.latestReversal.direction}) แต่ทิศทางขัดกับเทรนด์ ${bigLabel} (${pair.trendBig}) — ไม่เข้า`;
+  }
+  if (!pair.stochSignal || ((pair.trendBig === 'Bullish' && pair.stochSignal !== 'Buy') || (pair.trendBig === 'Bearish' && pair.stochSignal !== 'Sell'))) {
+    return `${smallLabel} มีจุดหักตรงทิศ ${bigLabel} แล้ว (${pair.latestReversal.direction}) แต่ Stochastic ของ ${smallLabel} ยังไม่ยืนยันโซนกลับตัว — รอก่อน`;
+  }
+  return `ยังไม่ครบเงื่อนไขคอนเฟิร์มของคู่ ${bigLabel}↔${smallLabel}`;
+}
+
+// บังคับ hard gate ด้วยโค้ด ไม่ไว้ใจแค่คำสั่งใน prompt — ล้างช่องเข้าไม้ถ้าเงื่อนไขยังไม่ครบ (ทำทั้ง 2 คู่แยกกัน)
+function enforceOnePairGate(planFromClaude, pair, shortAllowed, bigLabel, smallLabel) {
+  const plan = planFromClaude || {};
+  plan.pair = `${bigLabel}+${smallLabel}`;
+  plan.confirmed = pair.confirmed;
+  plan.detail = {
+    trendBig: pair.trendBig,
+    latestReversal: pair.latestReversal,
+    stochSignal: pair.stochSignal,
   };
-  analysis.setup_status = cascadeStatusText(cascade);
 
-  // Buy-bias skew: Short ได้ก็ต่อเมื่อ D และ 4H เทรนด์ Bearish ชัดเจนทั้งคู่ (ไม่ใช่ Sideway)
-  if (analysis.bias === 'Short' && !shortAllowed) {
-    analysis.bias = 'Wait';
-    analysis.setup_status += ' · ไม่อนุญาตให้ Short เพราะเทรนด์ใหญ่ (D/4H) ยังไม่ Bearish ชัดเจน (เน้น Buy เป็นหลัก)';
-  }
-  if (analysis.trade_idea.direction === 'Short' && !shortAllowed) {
-    analysis.trade_idea.direction = null;
-  }
+  let blockedByShortGate = false;
+  if (pair.direction === 'Short' && !shortAllowed) blockedByShortGate = true;
 
-  const entryReady =
-    cascade.confirmed && (cascade.direction === 'Long' || (cascade.direction === 'Short' && shortAllowed));
+  plan.status_text = blockedByShortGate
+    ? `${pairStatusText(pair, bigLabel, smallLabel)} · ไม่อนุญาตให้ Short เพราะเทรนด์ใหญ่ (D/4H) ยังไม่ Bearish ชัดเจน (เน้น Buy เป็นหลัก)`
+    : pairStatusText(pair, bigLabel, smallLabel);
+
+  const entryReady = pair.confirmed && !blockedByShortGate;
 
   if (!entryReady) {
-    analysis.trade_idea.entry_zone = '-';
-    analysis.trade_idea.stop_loss = '-';
-    analysis.trade_idea.take_profit = [];
-    analysis.trade_idea.rr_ratio = '-';
+    plan.direction = blockedByShortGate ? null : pair.direction;
+    plan.entry_zone = '-';
+    plan.stop_loss = '-';
+    plan.take_profit = [];
+    plan.rr_ratio = '-';
   } else {
-    analysis.trade_idea.direction = cascade.direction;
+    plan.direction = pair.direction;
+  }
+  plan.confirmed = entryReady;
+  return plan;
+}
+
+function enforcePairGates(analysis, pairSignals, shortAllowed) {
+  analysis.trade_idea = analysis.trade_idea || {};
+  analysis.trade_idea.plan_4h_15m = enforceOnePairGate(
+    analysis.trade_idea.plan_4h_15m, pairSignals.pairA, shortAllowed, '4H', '15M'
+  );
+  analysis.trade_idea.plan_1h_5m = enforceOnePairGate(
+    analysis.trade_idea.plan_1h_5m, pairSignals.pairB, shortAllowed, '1H', '5M'
+  );
+
+  // overall_bias (ใช้แสดงป้ายรวมบนแดชบอร์ด) ก็ผ่าน buy-bias skew เดียวกัน
+  if (analysis.bias === 'Short' && !shortAllowed) {
+    analysis.bias = 'Wait';
   }
 }
 
@@ -454,30 +482,40 @@ const SYSTEM_PROMPT = `คุณเป็นผู้ช่วยสรุปโ
 
 2) เล่นสั้นจบในวันเดียว: ทุกแผนต้องปิดภายในวันเดียวกัน ไม่มีแผนถือข้ามคืนหรือหลายวันอีกต่อไป ถ้าใกล้หมดช่วงเวลาที่เหมาะเทรดของวันนั้นให้เตือนใน plan_summary
 
-3) TF หลักที่ตัดสินใจเข้าไม้จริงคือ 15M / 30M / 1H เท่านั้น (D/4H/5M เป็นบริบทประกอบไม่ใช่ตัวชี้เข้าไม้)
+3) ระบบวิเคราะห์เป็น "คู่ TF" (TF ใหญ่ = เทรนด์/บริบท, TF เล็ก = จุดเข้าไม้) แยก 2 คู่อิสระกัน ไม่ใช่แผนเดียวอีกต่อไป:
+   - คู่ A = 4H (ใหญ่) ↔ 15M (เล็ก)
+   - คู่ B = 1H (ใหญ่) ↔ 5M (เล็ก)
+   แต่ละคู่มีแผนเทรดของตัวเอง ไม่เกี่ยวกัน — คู่หนึ่งคอนเฟิร์มอาจจะมีแผน ส่วนอีกคู่ยังไม่คอนเฟิร์มก็ได้ ให้ตอบทั้ง 2 คู่เสมอ (30M เป็นแค่บริบทประกอบไม่ใช่ TF เข้าไม้แล้ว)
 
-4) Cascade confirmation (ระบบคำนวณมาให้แล้วเป็น object "cascade" — ใช้ตรงๆ ห้ามตีความใหม่):
-   - "จุดหัก" (จุดกลับตัวปลายแหลม) ต้องเกิดที่ 15M และ 30M ไปทิศทางเดียวกัน (30M แค่เริ่มหักก็นับว่าคอนเฟิร์ม) ถ้า 15M หักแล้วแต่ 30M ยังไม่หักตาม = ยังไม่เข้า
-   - Stochastic ของ 15M ต้องตัดกันอยู่ในโซนกลับตัวที่ตรงทิศทาง (ต่ำกว่า 25 = สัญญาณซื้อ / เหนือ 75 = สัญญาณขาย)
-   - 1H ใช้เป็นตัวเช็คทิศทางแบบ soft เท่านั้น (ดูประกอบว่า bias ของ 1H ไปทางเดียวกันไหม ไม่ใช่เงื่อนไขบังคับ)
-   - ถ้า cascade.confirmed = false ห้ามใส่ตัวเลขใน entry_zone/stop_loss/take_profit เด็ดขาด ให้ใส่ "-" ทุกช่อง และอธิบายใน setup_status ว่ากำลังรอ TF ไหนยืนยัน (ระบบจะล้างค่าให้ตรงกันอีกชั้นอยู่แล้วถ้าคุณพลาด)
+4) เงื่อนไขคอนเฟิร์มต่อคู่ (ระบบคำนวณมาให้แล้วเป็น object "pairA"/"pairB" — ใช้ตรงๆ ห้ามตีความใหม่):
+   - เทรนด์ของ TF ใหญ่ (deterministic จาก EMA: Bullish/Bearish/Sideway) ต้อง "ตรงทิศ" กับ "จุดหัก" (จุดกลับตัวปลายแหลม) ที่เกิดบน TF เล็ก — ถ้า TF ใหญ่เป็น Sideway ถือว่าไม่คอนเฟิร์มเสมอ
+   - Stochastic ของ TF เล็กต้องตัดกันอยู่ในโซนกลับตัวที่ตรงทิศทางเดียวกันด้วย (ต่ำกว่า 25 = ซื้อ / เหนือ 75 = ขาย)
+   - ถ้า pairX.confirmed = false ห้ามใส่ตัวเลขใน entry_zone/stop_loss/take_profit ของคู่นั้นเด็ดขาด ให้ใส่ "-" ทุกช่อง (ระบบจะล้างค่าให้ตรงกันอีกชั้นอยู่แล้วถ้าคุณพลาด)
 
-5) ทุก field ข้อความต้องกระชับที่สุด — "structure_note" และ "smc_zones" ของแต่ละ timeframe ห้ามเกิน 1 ประโยคสั้นๆ (ไม่เกิน ~25 คำ), "overall_structure_note" และ "plan_summary" ห้ามเกิน 3 ประโยคสั้นๆ, "confidence_note" ห้ามเกิน 1 ประโยค, "note" ใน trade_idea ห้ามเกิน 1 ประโยคสั้นๆ ห้ามใส่รายละเอียดราคาซ้ำกับ support/resistance levels ที่มีอยู่แล้ว เพราะคำตอบต้องจบเป็น JSON ที่สมบูรณ์เสมอ ห้ามถูกตัดกลางคัน
+5) ทุก field ข้อความต้องกระชับที่สุด — "structure_note" และ "smc_zones" ของแต่ละ timeframe ห้ามเกิน 1 ประโยคสั้นๆ (ไม่เกิน ~25 คำ), "overall_structure_note" และ "plan_summary" ห้ามเกิน 3 ประโยคสั้นๆ, "confidence_note" ห้ามเกิน 1 ประโยค, "note" ในแต่ละแผนห้ามเกิน 1 ประโยคสั้นๆ ห้ามใส่รายละเอียดราคาซ้ำกับ support/resistance levels ที่มีอยู่แล้ว เพราะคำตอบต้องจบเป็น JSON ที่สมบูรณ์เสมอ ห้ามถูกตัดกลางคัน
 
 ตอบกลับเป็น JSON ล้วนๆ เท่านั้น (ไม่มีข้อความอื่นนอก JSON ไม่มี markdown code fence) ตามโครงสร้างนี้เป๊ะๆ:
 {
   "overall_bias": "Long หรือ Short หรือ Wait",
-  "overall_structure_note": "สรุปภาพรวมจากทั้ง 6 timeframe สั้นๆ ว่าสอดคล้องกันไหม (confluence) หรือขัดแย้งกันตรงไหน เน้นว่า TF หลัก (15M/30M/1H) เป็นอย่างไร",
-  "plan_summary": "สรุปแผนของวันนี้สั้นๆ ไม่เกิน 4 บรรทัด บอกว่าควรโฟกัส TF ไหน โซนที่น่าสนใจ ย้ำว่าต้องจบในวัน ห้ามใช้ภาษาฟันธงแบบคำสั่งซื้อขาย เช่น ห้ามพูดว่า \\"ให้เข้าซื้อตอนนี้\\"",
+  "overall_structure_note": "สรุปภาพรวมจากทั้ง 6 timeframe สั้นๆ ว่าสอดคล้องกันไหม (confluence) หรือขัดแย้งกันตรงไหน เน้นว่าคู่ A (4H/15M) และคู่ B (1H/5M) เป็นอย่างไร",
+  "plan_summary": "สรุปแผนของวันนี้สั้นๆ ไม่เกิน 4 บรรทัด บอกว่าคู่ไหนน่าสนใจกว่า โซนที่น่าสนใจ ย้ำว่าต้องจบในวัน ห้ามใช้ภาษาฟันธงแบบคำสั่งซื้อขาย เช่น ห้ามพูดว่า \\"ให้เข้าซื้อตอนนี้\\"",
   "confidence_note": "ข้อควรระวัง หรือเงื่อนไขที่จะทำให้มุมมองนี้เปลี่ยนไป",
   "confidence_score": 0,
   "trade_idea": {
-    "direction": "Long หรือ Short หรือ null ถ้ายังไม่ครบเงื่อนไข",
-    "entry_zone": "ช่วงราคาที่น่าสนใจ อิงโครงสร้าง 15M/30M เป็นหลัก เช่น '4478-4487' ถ้า cascade ยังไม่ confirmed ให้ใส่ '-'",
-    "stop_loss": "ราคา SL วางเลยจุดหักล่าสุดของ 15M/30M ไปพอประมาณ กันโดน noise สะบัด หรือ '-' ถ้ายังไม่ confirmed",
-    "take_profit": ["TP1", "TP2"],
-    "rr_ratio": "เช่น '1:1.8' หรือ '-'",
-    "note": "อธิบายสั้นๆ 1 ประโยคว่าทำไมควรปิดไม้ภายในวันนี้ หรือเหตุผลอื่นที่เกี่ยวกับความเสี่ยง"
+    "plan_4h_15m": {
+      "entry_zone": "ช่วงราคาที่น่าสนใจ อิงโครงสร้าง 15M เป็นหลัก เช่น '4478-4487' ถ้า pairA ยังไม่ confirmed ให้ใส่ '-'",
+      "stop_loss": "ราคา SL วางเลยจุดหักล่าสุดของ 15M ไปพอประมาณ กันโดน noise สะบัด หรือ '-' ถ้ายังไม่ confirmed",
+      "take_profit": ["TP1", "TP2"],
+      "rr_ratio": "เช่น '1:1.8' หรือ '-'",
+      "note": "อธิบายสั้นๆ 1 ประโยคเกี่ยวกับคู่นี้ หรือทำไมควรปิดไม้ภายในวันนี้"
+    },
+    "plan_1h_5m": {
+      "entry_zone": "ช่วงราคาที่น่าสนใจ อิงโครงสร้าง 5M เป็นหลัก เช่น '4478-4487' ถ้า pairB ยังไม่ confirmed ให้ใส่ '-'",
+      "stop_loss": "ราคา SL วางเลยจุดหักล่าสุดของ 5M ไปพอประมาณ กันโดน noise สะบัด หรือ '-' ถ้ายังไม่ confirmed",
+      "take_profit": ["TP1", "TP2"],
+      "rr_ratio": "เช่น '1:1.5' หรือ '-'",
+      "note": "อธิบายสั้นๆ 1 ประโยคเกี่ยวกับคู่นี้ (สแคลป์ไวกว่าคู่ 4H/15M) หรือทำไมควรปิดไม้ภายในวันนี้"
+    }
   },
   "timeframes": {
     "D": { "trend": "ใช้ค่าที่ระบบให้มาตรงๆ", "bias": "Long หรือ Short หรือ Wait", "structure_note": "...", "smc_zones": "...", "support_levels": [], "resistance_levels": [] },
@@ -490,7 +528,7 @@ const SYSTEM_PROMPT = `คุณเป็นผู้ช่วยสรุปโ
 }
 สำคัญ: นี่คือการสรุปโครงสร้างราคาเพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุนที่รับประกันผลลัพธ์ และไม่ใช่คำสั่งซื้อขายที่ชี้นำโดยตรง confidence_score คือความมั่นใจของ "การอ่านโครงสร้าง" ไม่ใช่การการันตีผลกำไร`;
 
-async function analyzeWithClaude(candlesByTf, indicatorsByTf, cascade, shortAllowed) {
+async function analyzeWithClaude(candlesByTf, indicatorsByTf, pairSignals, shortAllowed) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY');
 
@@ -526,20 +564,24 @@ async function analyzeWithClaude(candlesByTf, indicatorsByTf, cascade, shortAllo
     );
   };
 
-  const cascadeText =
-    `cascade (คำนวณมาให้แล้ว ใช้ตรงๆ ห้ามตีความใหม่):\n` +
-    `- confirmed: ${cascade.confirmed}\n` +
-    `- direction: ${cascade.direction || '-'}\n` +
-    `- 15M จุดหักล่าสุด: ${cascade.tf15 ? `${cascade.tf15.direction} @ ${cascade.tf15.price}` : 'ไม่มี/ไม่สด'}\n` +
-    `- 30M จุดหักล่าสุด: ${cascade.tf30 ? `${cascade.tf30.direction} @ ${cascade.tf30.price}` : 'ไม่มี/ไม่สด'}\n` +
-    `- Stochastic 15M ล่าสุด: ${cascade.stoch15 || 'ไม่มี crossover ในโซน'}\n` +
-    `- 1H trend (soft check): ${cascade.tf1h_soft}\n` +
-    `- shortAllowed (D และ 4H Bearish ทั้งคู่หรือไม่): ${shortAllowed}`;
+  const pairText = (label, pair) =>
+    `${label} (คำนวณมาให้แล้ว ใช้ตรงๆ ห้ามตีความใหม่):\n` +
+    `- confirmed: ${pair.confirmed}\n` +
+    `- direction: ${pair.direction || '-'}\n` +
+    `- เทรนด์ TF ใหญ่: ${pair.trendBig}\n` +
+    `- จุดหักล่าสุดของ TF เล็ก: ${pair.latestReversal ? `${pair.latestReversal.direction} @ ${pair.latestReversal.price}` : 'ไม่มี/ไม่สด'}\n` +
+    `- Stochastic ของ TF เล็กล่าสุด: ${pair.stochSignal || 'ไม่มี crossover ในโซน'}`;
+
+  const pairsText =
+    pairText('pairA (4H ↔ 15M)', pairSignals.pairA) +
+    '\n\n' +
+    pairText('pairB (1H ↔ 5M)', pairSignals.pairB) +
+    `\n\nshortAllowed (D และ 4H Bearish ทั้งคู่หรือไม่): ${shortAllowed}`;
 
   const userContent =
     `เวลาปัจจุบัน (ไทย): ${nowThai}\n` +
     `ราคาล่าสุด (close ของ 15M ล่าสุด): ${lastPrice}\n\n` +
-    cascadeText +
+    pairsText +
     '\n\n' +
     tfKeys.map((k) => section(`Timeframe ${k}`, k, candlesByTf[k], indicatorsByTf[k])).join('\n\n');
 
@@ -589,8 +631,10 @@ async function analyzeWithClaude(candlesByTf, indicatorsByTf, cascade, shortAllo
     plan_summary: parsed.plan_summary,
     confidence_note: parsed.confidence_note,
     confidence_score: Number.isFinite(parsed.confidence_score) ? parsed.confidence_score : null,
-    trade_idea: parsed.trade_idea || {},
-    setup_status: parsed.setup_status || '',
+    trade_idea: {
+      plan_4h_15m: (parsed.trade_idea && parsed.trade_idea.plan_4h_15m) || {},
+      plan_1h_5m: (parsed.trade_idea && parsed.trade_idea.plan_1h_5m) || {},
+    },
     timeframes: parsed.timeframes || {},
   };
 }
@@ -640,8 +684,8 @@ async function saveToSupabase(candlesByTf, indicatorsByTf, analysis) {
       confidence_score: analysis.confidence_score,
       full_analysis: analysis.full_text,
       timeframes_json: analysis.timeframes,
-      trade_idea_json: analysis.trade_idea, // แผนเดียว/วัน รวม cascade object ไว้ข้างในแล้ว
-      trade_idea_short_json: null, // เลิกใช้แผนระยะสั้นแยก (ยุบเป็นแผนเดียวจบในวัน) — เก็บ column ไว้เฉยๆ ไม่ต้อง migration
+      trade_idea_json: analysis.trade_idea, // { plan_4h_15m, plan_1h_5m } — 2 แผนคู่อิสระกัน, status_text/detail ฝังอยู่ในแต่ละแผนแล้ว
+      trade_idea_short_json: null, // เลิกใช้แล้ว (ยุบเป็น 2 แผนคู่แทน) — เก็บ column ไว้เฉยๆ ไม่ต้อง migration
       indicators_json: indicatorsByTf,
       raw_candles: candlesByTf,
     }),
@@ -694,7 +738,18 @@ async function notifyTelegram(analysis, previous, isNewSignal) {
     return `${label}: ${t.trend || '-'} / ${t.bias || '-'}\n`;
   };
   const ti = analysis.trade_idea || {};
-  const hasPlan = ti.entry_zone && ti.entry_zone !== '-';
+  const planBlock = (title, plan) => {
+    plan = plan || {};
+    const hasPlan = plan.entry_zone && plan.entry_zone !== '-';
+    if (hasPlan) {
+      return (
+        `📋 ${title} — ${plan.direction || '-'}\n` +
+        `Entry: ${plan.entry_zone || '-'} | SL: ${plan.stop_loss || '-'} | TP: ${(plan.take_profit || []).join(', ') || '-'} | R:R ${plan.rr_ratio || '-'}\n` +
+        `⏱️ ปิดไม้ภายในวันนี้ ไม่ถือข้ามคืน\n`
+      );
+    }
+    return `📋 ${title} — ยังไม่ครบเงื่อนไข\n${plan.status_text || 'รอจุดหัก + Stochastic ยืนยันทิศเดียวกับเทรนด์ใหญ่'}\n`;
+  };
 
   const headline = isNewSignal
     ? `🥇 XAUUSD — พบสัญญาณใหม่\nเปลี่ยนจาก: ${prevBiasText} → ${analysis.bias}`
@@ -705,18 +760,10 @@ async function notifyTelegram(analysis, previous, isNewSignal) {
     (analysis.confidence_score != null ? ` (Confidence ${analysis.confidence_score}%)` : '') +
     `\n\n` +
     `ราคา: ${analysis.price}\n\n` +
-    `TF หลัก (ใช้เข้าไม้):\n` +
-    tfLine('1H', '1h') +
-    tfLine('30M', '30m') +
-    tfLine('15M', '15m') +
-    `\nบริบท: ` +
-    `D ${((tf.D || {}).trend) || '-'} · 4H ${((tf['4h'] || {}).trend) || '-'} · 5M ${((tf['5m'] || {}).trend) || '-'}\n\n` +
-    `⚙️ สถานะคอนเฟิร์ม: ${analysis.setup_status || '-'}\n\n` +
-    (hasPlan
-      ? `📋 แผนวันนี้ (${ti.direction || analysis.bias})\n` +
-        `Entry: ${ti.entry_zone || '-'} | SL: ${ti.stop_loss || '-'} | TP: ${(ti.take_profit || []).join(', ') || '-'} | R:R ${ti.rr_ratio || '-'}\n` +
-        `⏱️ ต้องปิดไม้ภายในวันนี้ ไม่ถือข้ามคืน\n`
-      : `📋 แผนวันนี้: ยังไม่ครบเงื่อนไขเข้าไม้ (รอจุดหัก 15M+30M ตรงกัน + Stochastic ยืนยัน) — รอดูรอบถัดไป\n`) +
+    `บริบทเทรนด์: D ${((tf.D || {}).trend) || '-'} · 4H ${((tf['4h'] || {}).trend) || '-'} · 1H ${((tf['1h'] || {}).trend) || '-'} · 30M ${((tf['30m'] || {}).trend) || '-'}\n\n` +
+    planBlock('คู่ A (4H ↔ 15M)', ti.plan_4h_15m) +
+    `\n` +
+    planBlock('คู่ B (1H ↔ 5M)', ti.plan_1h_5m) +
     `\nแผน: ${analysis.plan_summary}\n` +
     `ข้อควรระวัง: ${analysis.confidence_note || '-'}\n\n` +
     `🔗 ดูกราฟ + รายละเอียดเต็มที่ dashboard: ${DASHBOARD_URL}\n\n` +
