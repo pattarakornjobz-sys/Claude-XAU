@@ -114,6 +114,8 @@
   .legend i.dash{width:12px; height:0; border-top:1px dashed}
 
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px}
+  .grid3 .stat .v{font-size:15px}
   .stat{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:11px; padding:11px 12px; display:flex; flex-direction:column; gap:4px}
   .stat .k{font:400 9.5px var(--mono); color:var(--tm); letter-spacing:.08em}
   .stat .v{font:600 13.5px var(--mono)}
@@ -264,10 +266,11 @@
 const SUPABASE_URL = 'https://uhefxwccuqagnbrbidbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZWZ4d2NjdXFhZ25icmJpZGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDI1NDYsImV4cCI6MjEwMTU3ODU0Nn0.EE5QWPVjSkZpUTU37hgiz4LsGMAfq87dxFOkt9OYynY';
 const TF_KEYS = ['D','4h','1h','30m','15m','5m'], TF_LABEL = {'D':'D','4h':'4H','1h':'1H','30m':'30M','15m':'15M','5m':'5M'};
-const PRIMARY_TFS = ['4h','1h','15m','5m']; // TF ที่ใช้ในคู่เข้าไม้จริง: คู่ A=4H↔15M, คู่ B=1H↔5M (D/30M เป็นบริบท)
+const PRIMARY_TF = '1h'; // TF หลักที่ใช้สร้างสัญญาณเข้าไม้จริง (EMA9/21 + RSI + Supertrend) — TF อื่นเป็นบริบท
 const CONFLUENCE_STRONG = 4, CONFLUENCE_MED = 2; // ตรงกัน >=4 จาก 6 TF = เด่นมาก, >=2 = เด่นปานกลาง
 
 let rows = [], row = null, activeTf = '1h', chart = null, series = null, priceLines = [];
+let stUpSeries = null, stDownSeries = null;
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -433,12 +436,12 @@ function renderOverview() {
         const i = inds[k] || {};
         const rk = i.rsiStatus === 'Overbought' ? 'r' : i.rsiStatus === 'Oversold' ? 'g' : 'n';
         const mk = i.macdStatus === 'Bullish' ? 'g' : i.macdStatus === 'Bearish' ? 'r' : 'n';
-        const sk = i.stochSignal === 'Buy' ? 'g' : i.stochSignal === 'Sell' ? 'r' : 'n';
-        const isPrimary = PRIMARY_TFS.includes(k);
+        const stk = i.supertrendDirection === 'Bullish' ? 'g' : i.supertrendDirection === 'Bearish' ? 'r' : 'n';
+        const isPrimary = k === PRIMARY_TF;
         return `
         <div class="tfc">
           <div class="h"><span class="n">${TF_LABEL[k]}</span>${isPrimary ? '<span class="primary-tag">TF หลัก</span>' : ''}${badge(d.bias, true)}</div>
-          <div class="t">เทรนด์: ${esc(d.trend) || '-'}</div>
+          <div class="t">เทรนด์ (Supertrend): <b class="${stk}">${esc(i.supertrendDirection) || esc(d.trend) || '-'}</b></div>
           <div class="note">${esc(d.structure_note) || '-'}</div>
           ${d.smc_zones ? `<div class="smc">SMC: ${esc(d.smc_zones)}</div>` : ''}
           <div class="lv">
@@ -448,15 +451,15 @@ function renderOverview() {
           <div class="ind">
             <span>RSI <b class="${rk}">${i.rsi14 != null ? esc(i.rsi14) : '-'}</b></span>
             <span>MACD <b class="${mk}">${esc(i.macdStatus || 'Neutral')}</b></span>
-            <span>Stoch <b class="${sk}">${i.stochK != null ? esc(i.stochK) + '/' + esc(i.stochD) : '-'}${i.stochSignal ? ' ' + esc(i.stochSignal) : ''}</b></span>
-            <span>EMA50 <b class="n">${i.ema50 != null ? esc(i.ema50) : '-'}</b></span>
+            <span>EMA9/21 <b class="n">${i.ema9 != null ? esc(i.ema9) : '-'} / ${i.ema21 != null ? esc(i.ema21) : '-'}</b></span>
+            <span>ATR <b class="n">${i.atr14 != null ? esc(i.atr14) : '-'}</b></span>
           </div>
         </div>`;
       }).join('')}
     </div>
 
     <div class="fine" style="margin-bottom:2px">
-      <span class="c3">ตัวหนาสีทอง</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe · <span class="primary-tag" style="padding:1px 5px">TF หลัก</span> = ใช้ในคู่เข้าไม้จริง (4H↔15M / 1H↔5M)
+      <span class="c3">ตัวหนาสีทอง</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe · <span class="primary-tag" style="padding:1px 5px">TF หลัก</span> = ใช้สร้างสัญญาณเข้าไม้จริง (${TF_LABEL[PRIMARY_TF]})
     </div>
     <div class="disc">⚠️ สรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุน เน้นฝั่ง Buy เป็นหลัก เทรดจบภายในวันเดียว ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ</div>
   `;
@@ -478,6 +481,8 @@ function buildChart() {
     upColor: '#0ca30c', downColor: '#d03b3b', borderVisible: false,
     wickUpColor: '#0ca30c', wickDownColor: '#d03b3b'
   });
+  stUpSeries = chart.addLineSeries({ color: 'rgba(12,163,12,.85)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  stDownSeries = chart.addLineSeries({ color: 'rgba(208,59,59,.85)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
   drawChart(); renderChartLevels();
 }
 
@@ -495,10 +500,39 @@ function drawChart() {
   const hi = Math.max(...data.map(c => c.high)), lo = Math.min(...data.map(c => c.low));
   $('#chartRange').textContent = fmt(lo,0) + ' – ' + fmt(hi,0);
 
+  // เส้น Supertrend ซ้อนบนกราฟ: แยก 2 เส้น (ขึ้น/ลง) เพื่อให้เปลี่ยนสีตามทิศทาง
+  const stRaw = ((row.indicators_json || {})[activeTf] || {}).supertrendSeries;
+  if (stUpSeries && stDownSeries) {
+    if (Array.isArray(stRaw) && stRaw.length) {
+      const stPts = stRaw.map(p => ({
+        time: Math.floor(new Date(String(p.time).replace(' ','T') + 'Z').getTime() / 1000),
+        value: num(p.value), direction: p.direction
+      })).filter(p => Number.isFinite(p.time) && p.value != null).sort((a,b) => a.time - b.time);
+      const upPts = stPts.filter(p => p.direction === 'up').map(p => ({ time: p.time, value: p.value }));
+      const downPts = stPts.filter(p => p.direction === 'down').map(p => ({ time: p.time, value: p.value }));
+      stUpSeries.setData(upPts);
+      stDownSeries.setData(downPts);
+    } else {
+      stUpSeries.setData([]); stDownSeries.setData([]);
+    }
+  }
+
   priceLines.forEach(l => series.removePriceLine(l)); priceLines = [];
   const d = (row.timeframes_json || {})[activeTf] || {};
   (d.support_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(12,163,12,.7)', lineWidth:1, lineStyle:2, title:'S' })); });
   (d.resistance_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(208,59,59,.7)', lineWidth:1, lineStyle:2, title:'R' })); });
+
+  // เส้น Entry/SL/TP1-3 — แสดงเฉพาะตอนดู TF หลัก และสัญญาณคอนเฟิร์มแล้วเท่านั้น
+  if (activeTf === PRIMARY_TF) {
+    const ti = row.trade_idea_json || {};
+    if (ti.confirmed) {
+      const entry = num(ti.entry_zone), sl = num(ti.stop_loss);
+      const tp = Array.isArray(ti.take_profit) ? ti.take_profit.map(num) : [];
+      if (entry) priceLines.push(series.createPriceLine({ price: entry, color: 'rgba(212,175,55,.9)', lineWidth: 2, lineStyle: 0, title: 'ENTRY' }));
+      if (sl) priceLines.push(series.createPriceLine({ price: sl, color: 'rgba(208,59,59,.9)', lineWidth: 1, lineStyle: 2, title: 'SL' }));
+      tp.forEach((p, idx) => { if (p) priceLines.push(series.createPriceLine({ price: p, color: 'rgba(12,163,12,.9)', lineWidth: 1, lineStyle: 2, title: 'TP' + (idx + 1) })); });
+    }
+  }
 }
 
 function renderChartLevels() {
@@ -511,33 +545,28 @@ function renderChartLevels() {
   `;
 }
 
-/* ---------- plan — 2 แผนคู่อิสระกัน: คู่ A (4H↔15M) และ คู่ B (1H↔5M), จบในวัน ไม่ถือข้ามคืน ---------- */
-function detailRow(label, info) {
-  if (!info) return `<div class="hist"><span>${esc(label)}</span><span class="p">ยังไม่มีจุดหักที่สด</span></div>`;
-  const dirTh = info.direction === 'bullish' ? 'ขาขึ้น (Bullish)' : 'ขาลง (Bearish)';
-  return `<div class="hist"><span>${esc(label)}</span><span class="p">${esc(dirTh)} @ ${fmt(info.price)}</span></div>`;
-}
-
-function planCard(title, plan, idSuffix) {
+/* ---------- plan — สัญญาณเดียวจาก TF หลัก (EMA9/21 + RSI + Supertrend), Entry/SL/TP คำนวณจาก ATR ล้วนๆ ---------- */
+function planCard(title, plan) {
   plan = plan || {};
-  const has = plan.entry_zone && plan.entry_zone !== '-';
+  const has = plan.confirmed && plan.entry_zone && plan.entry_zone !== '-';
   const tp = Array.isArray(plan.take_profit) ? plan.take_profit.filter(Boolean) : [];
   const d = plan.detail || {};
+  const sig = d.signal || {};
 
   const detailCard = `
     <div class="card stack" style="gap:2px; margin-top:9px">
-      <span class="lbl" style="margin-bottom:6px">สถานะคอนเฟิร์ม (${esc(plan.pair) || '-'})</span>
+      <span class="lbl" style="margin-bottom:6px">สถานะสัญญาณ (${esc(TF_LABEL[PRIMARY_TF]) || '-'})</span>
       <div class="fine" style="margin-bottom:8px">${esc(plan.status_text) || '-'}</div>
-      ${detailRow('จุดหัก TF เล็กล่าสุด', d.latestReversal)}
-      <div class="hist"><span>เทรนด์ TF ใหญ่</span><span class="p">${esc(d.trendBig) || '-'}</span></div>
-      <div class="hist"><span>Stochastic TF เล็ก</span><span class="p">${esc(d.stochSignal) || 'ยังไม่ตัดกันในโซน'}</span></div>
+      <div class="hist"><span>Supertrend</span><span class="p">${esc(d.supertrendDirection) || '-'}</span></div>
+      <div class="hist"><span>RSI ตอนตัด</span><span class="p">${sig.rsiAtCross != null ? esc(sig.rsiAtCross) : '-'}</span></div>
+      <div class="hist"><span>ATR(14)</span><span class="p">${d.atr14 != null ? esc(d.atr14) : '-'}</span></div>
     </div>`;
 
   if (!has) {
     return `
       <div class="card">
         <span class="lbl">${esc(title)}</span>
-        <div class="fine" style="margin-top:8px">ยังไม่ครบเงื่อนไขเข้าไม้คู่นี้ — ต้องให้เทรนด์ TF ใหญ่ตรงทิศกับ "จุดหัก" (ปลายแหลม) ของ TF เล็ก พร้อม Stochastic ยืนยันโซนกลับตัว ถ้ายังไม่ครบ ระบบจะไม่เสนอ Entry/SL/TP ให้ (ป้องกันเข้าไม้มั่วแล้วโดน SL รัว)</div>
+        <div class="fine" style="margin-top:8px">ยังไม่ครบเงื่อนไขเข้าไม้ — ต้องให้ EMA9/21 ตัดกันพร้อม RSI ยืนยันและ Supertrend ตรงทิศบน ${esc(TF_LABEL[PRIMARY_TF])} ถ้ายังไม่ครบ ระบบจะไม่เสนอ Entry/SL/TP ให้ (ป้องกันเข้าไม้มั่วแล้วโดน SL รัว)</div>
       </div>
       ${detailCard}
     `;
@@ -550,20 +579,26 @@ function planCard(title, plan, idSuffix) {
         ${badge(dir, true).replace('b-Wait','b-'+dir)}
       </div>
       <div class="grid2">
-        <div class="stat"><div class="k">ENTRY ZONE</div><div class="v" style="color:var(--gold)">${esc(plan.entry_zone)}</div></div>
+        <div class="stat"><div class="k">ENTRY</div><div class="v" style="color:var(--gold)">${esc(plan.entry_zone)}</div></div>
         <div class="stat"><div class="k">STOP LOSS</div><div class="v" style="color:var(--crit)">${esc(plan.stop_loss) || '-'}</div></div>
-        <div class="stat"><div class="k">TAKE PROFIT</div><div class="v" style="color:var(--good)">${esc(tp.join(' / ')) || '-'}</div></div>
-        <div class="stat"><div class="k">R:R</div><div class="v">${esc(plan.rr_ratio) || '-'}</div></div>
       </div>
-      <div class="fine" style="margin-top:12px">${esc(plan.note) || 'ตัวเลข Entry / SL / TP เป็นการประมาณจากโครงสร้างราคาเท่านั้น ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง และปิดไม้ภายในวันนี้'}</div>
-      <button id="usePlan${idSuffix}" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
+      <div class="grid3" style="margin-top:9px">
+        <div class="stat"><div class="k">TP1</div><div class="v" style="color:var(--good)">${esc(tp[0]) || '-'}</div></div>
+        <div class="stat"><div class="k">TP2</div><div class="v" style="color:var(--good)">${esc(tp[1]) || '-'}</div></div>
+        <div class="stat"><div class="k">TP3</div><div class="v" style="color:var(--good)">${esc(tp[2]) || '-'}</div></div>
+      </div>
+      <div class="grid2" style="margin-top:9px">
+        <div class="stat"><div class="k">R:R (TP1)</div><div class="v">${esc(plan.rr_ratio) || '-'}</div></div>
+      </div>
+      <div class="fine" style="margin-top:12px">${esc(plan.note) || 'ตัวเลข Entry / SL / TP คำนวณจาก ATR ล้วนๆ ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง และปิดไม้ภายในวันนี้'}</div>
+      <button id="usePlan" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
     </div>
     ${detailCard}
   `;
 }
 
-function wireUsePlanButton(idSuffix, plan) {
-  const btn = document.getElementById('usePlan' + idSuffix);
+function wireUsePlanButton(plan) {
+  const btn = document.getElementById('usePlan');
   if (!btn) return;
   const tp = Array.isArray(plan.take_profit) ? plan.take_profit.filter(Boolean) : [];
   btn.onclick = () => {
@@ -575,19 +610,15 @@ function wireUsePlanButton(idSuffix, plan) {
 
 function renderPlan() {
   if (!row) return;
-  const ti = row.trade_idea_json || {};
-  const planA = ti.plan_4h_15m || {};
-  const planB = ti.plan_1h_5m || {};
+  const plan = row.trade_idea_json || {};
   const el = $('#planBody');
 
   el.innerHTML = `
     <div class="stack" style="gap:14px">
-      ${planCard('คู่ A: เทรนด์ 4H → เข้าไม้ 15M', planA, 'A')}
-      ${planCard('คู่ B: เทรนด์ 1H → เข้าไม้ 5M (สแคลป์ไวกว่า)', planB, 'B')}
+      ${planCard('สัญญาณเข้าไม้ (EMA9/21 + RSI + Supertrend)', plan)}
     </div>
   `;
-  wireUsePlanButton('A', planA);
-  wireUsePlanButton('B', planB);
+  wireUsePlanButton(plan);
 }
 
 /* ---------- calculator (แบ่งไม้) ---------- */
@@ -701,12 +732,8 @@ function calc() {
 }
 
 function prefillCalc() {
-  const ti = row.trade_idea_json || {};
-  const planA = ti.plan_4h_15m || {}, planB = ti.plan_1h_5m || {};
-  const hasA = planA.entry_zone && planA.entry_zone !== '-';
-  const hasB = planB.entry_zone && planB.entry_zone !== '-';
-  // เติมค่าเริ่มต้นจากแผนที่คอนเฟิร์มแล้ว (เลือกคู่ A ก่อนถ้ามีทั้งคู่) — ปุ่ม "ส่งตัวเลขนี้ไปหน้าคำนวณ" ในแต่ละการ์ดเลือกคู่ที่ต้องการเองได้เสมอ
-  planIdea = hasA ? planA : hasB ? planB : {};
+  // เติมค่าเริ่มต้นจากแผนที่คอนเฟิร์มแล้ว (ถ้ามี) — ปุ่ม "ส่งตัวเลขนี้ไปหน้าคำนวณ" บนการ์ดแผนก็ใช้ชุดเดียวกันนี้เสมอ
+  planIdea = row.trade_idea_json || {};
   const bv = localStorage.getItem('xau_cBal'); if (bv) $('#cBal').value = bv;
   const sv = localStorage.getItem('xau_cSplits'); if (sv) $('#cSplits').value = sv;
   renderSplits();
