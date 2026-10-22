@@ -5,138 +5,197 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>XAUUSD Analysis</title>
 <link rel="manifest" href="./manifest.json" />
-<meta name="theme-color" content="#0d0d0d" />
+<meta name="theme-color" content="#f3f6fb" />
 <link rel="icon" href="./icons/icon-192.png" type="image/png" />
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="XAUUSD" />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root{
-    --page:#0d0d0d; --surface:#1a1a19; --border:rgba(255,255,255,.09);
-    --tp:#ffffff; --ts:#c3c2b7; --tm:#898781; --tf:#6d6b66;
-    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --gold:#d4af37;
+    --bg:#f3f6fb; --surface:#ffffff; --surface-2:#eef3fa; --border:#e3e9f3;
+    --tp:#0f172a; --ts:#334155; --tm:#64748b; --tf:#94a3b8;
+    --primary:#2563eb; --primary-dk:#1d4ed8; --primary-soft:#eaf1ff;
+    --good:#16a34a; --good-soft:#eefdf3; --crit:#dc2626; --crit-soft:#fef2f2;
+    --warn:#d97706; --warn-soft:#fff8eb;
     --mono:'IBM Plex Mono',ui-monospace,monospace;
     --sans:'IBM Plex Sans Thai',system-ui,-apple-system,sans-serif;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{
-    margin:0; background:var(--page); color:var(--tp); font-family:var(--sans);
+    margin:0; background:var(--bg); color:var(--tp); font-family:var(--sans);
     display:flex; flex-direction:column; overflow:hidden;
-    padding-top:env(safe-area-inset-top);
+    padding-top:env(safe-area-inset-top); -webkit-font-smoothing:antialiased;
   }
-  a{color:var(--gold)} a:hover{color:#e8c869}
+  a{color:var(--primary)} a:hover{color:var(--primary-dk)}
 
   header{
-    flex:none; padding:12px 18px; display:flex; align-items:center; justify-content:space-between;
-    border-bottom:1px solid var(--border); background:var(--page);
+    flex:none; padding:13px 16px 12px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border); background:rgba(255,255,255,.92); backdrop-filter:blur(10px);
   }
   .brand{display:flex; flex-direction:column; gap:2px}
-  .brand b{font:700 16px var(--sans); letter-spacing:-.01em}
-  .brand span{font:400 10.5px var(--mono); color:var(--tm); letter-spacing:.04em}
+  .brand b{font:700 17px var(--sans); letter-spacing:-.01em; color:var(--tp)}
+  .brand span{font:500 10px var(--mono); color:var(--tf); letter-spacing:.03em}
   .live{
     display:flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px;
-    background:rgba(12,163,12,.12); border:1px solid rgba(12,163,12,.3);
+    background:var(--good-soft); border:1px solid #cdf0da;
     font:600 10.5px var(--mono); color:var(--good); letter-spacing:.05em;
   }
   .live i{width:6px;height:6px;border-radius:99px;background:var(--good);animation:pulse 2s infinite}
-  .live.stale{background:rgba(250,178,25,.12);border-color:rgba(250,178,25,.3);color:var(--warn)}
+  .live.stale{background:var(--warn-soft);border-color:#f2dfae;color:var(--warn)}
   .live.stale i{background:var(--warn)}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-  main{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 18px 26px}
-  .screen{display:none; flex-direction:column; gap:14px}
+  main{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 14px 22px}
+  .screen{display:none; flex-direction:column; gap:12px}
   .screen.on{display:flex}
 
-  .card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px}
-  .card.gold{background:linear-gradient(150deg,rgba(212,175,55,.13),rgba(26,26,25,.92) 55%); border-color:rgba(212,175,55,.28); border-radius:18px; padding:18px}
-  .lbl{font:400 10px var(--mono); color:var(--tm); letter-spacing:.1em}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow)}
+  .lbl{font:600 11px var(--mono); color:var(--tf); letter-spacing:.06em; text-transform:uppercase}
   .stack{display:flex; flex-direction:column; gap:8px}
 
-  .price-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px}
-  .price{font:600 34px var(--mono); color:var(--gold); line-height:1; letter-spacing:-.02em}
-  .updated{font:400 10.5px var(--mono); color:var(--tm); margin-top:6px}
-  .side{display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+  /* hero */
+  .hero{background:linear-gradient(145deg,#1d4ed8,#2563eb 55%,#3b82f6); border-radius:18px; padding:20px 18px; color:#fff; box-shadow:0 10px 28px rgba(37,99,235,.28)}
+  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px}
+  .hero-top .sym{font:700 12.5px var(--sans); letter-spacing:.02em; opacity:.92}
+  .hero-top .upd{font:500 10px var(--mono); opacity:.72; white-space:nowrap}
+  .hero-price{font:700 38px var(--mono); letter-spacing:-.02em; margin:10px 0 2px; line-height:1}
+  .hero-sub{font:500 11px var(--sans); opacity:.85}
+  .hero-bias{margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .pill-on-hero{display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,.18); color:#fff; border:1px solid rgba(255,255,255,.35); padding:6px 13px; border-radius:99px; font:700 12px var(--sans)}
+  .conf-hero{font:500 11px var(--sans); opacity:.88}
+
+  /* badges */
   .badge{display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px; font:700 13px var(--sans); white-space:nowrap}
   .badge.sm{font-size:11px; font-weight:600; padding:3px 10px}
-  .b-Long{color:var(--good); background:rgba(12,163,12,.14); border:1px solid rgba(12,163,12,.38)}
-  .b-Short{color:var(--crit); background:rgba(208,59,59,.14); border:1px solid rgba(208,59,59,.38)}
-  .b-Wait{color:var(--warn); background:rgba(250,178,25,.14); border:1px solid rgba(250,178,25,.38)}
-  .conf{
-    display:flex; flex-direction:column; align-items:center; gap:1px; padding:4px 10px; border-radius:10px;
-    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); white-space:nowrap;
-  }
-  .conf small{font:500 8.5px var(--mono); color:var(--tm); letter-spacing:.08em}
-  .conf b{font:600 12px var(--mono); color:var(--ts)}
-  .hr{height:1px; background:rgba(255,255,255,.09); margin:14px 0 12px}
-  .body{font:400 13px/1.65 var(--sans); color:var(--tp); text-wrap:pretty}
-  .body.dim{font-size:12.5px; color:var(--ts)}
+  .badge i{width:5px; height:5px; border-radius:99px; background:currentColor}
+  .b-Long{color:var(--good); background:var(--good-soft); border:1px solid #c8efd6}
+  .b-Short{color:var(--crit); background:var(--crit-soft); border:1px solid #f6cfcf}
+  .b-Wait{color:var(--warn); background:var(--warn-soft); border:1px solid #f2dfae}
 
-  .lvl{display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 14px}
-  .lvl .l{display:flex; align-items:center; gap:10px}
-  .lvl .bar{width:3px; height:26px; border-radius:99px}
-  .lvl .p{font:600 14px var(--mono); letter-spacing:-.01em}
-  .lvl .k{font:400 10.5px var(--sans); color:var(--tm)}
-  .lvl .tf{font:600 10px var(--mono); letter-spacing:.06em; padding:4px 9px; border-radius:6px; color:var(--gold); background:rgba(212,175,55,.12); border:1px solid rgba(212,175,55,.3)}
+  /* key points */
+  .points{display:flex; flex-direction:column; gap:11px}
+  .point{display:flex; gap:10px; align-items:flex-start}
+  .point .ic{flex:0 0 26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px}
+  .point .tx{font:400 12.5px/1.55 var(--sans); color:var(--ts)}
+  .point .tx b{color:var(--tp); font-weight:600}
+  .ic-trend{background:var(--primary-soft); color:var(--primary)}
+  .ic-signal{background:var(--good-soft); color:var(--good)}
+  .ic-risk{background:var(--warn-soft); color:var(--warn)}
+  .ic-wait{background:var(--surface-2); color:var(--tm)}
 
-  .tfc{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px}
-  .tfc .h{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
-  .tfc .n{font:700 14px var(--mono)}
-  .tfc .t{font:400 11.5px var(--sans); color:var(--tm); margin-bottom:7px}
-  .tfc .note{font:400 12.5px/1.6 var(--sans); color:var(--ts); text-wrap:pretty}
-  .tfc .smc{font:400 11.5px/1.6 var(--sans); color:var(--tm); margin-top:8px; padding-left:8px; border-left:2px solid var(--border)}
-  .tfc .lv{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:11px; font:400 11.5px/1.6 var(--mono); color:var(--ts)}
-  .tfc .lv .lbl{margin-bottom:3px}
-  .tfc .ind{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:11px; padding-top:10px; border-top:1px solid var(--border); font:400 11px var(--mono); color:var(--tm)}
-  .tfc .ind b{font-weight:600}
-  .c3{color:var(--gold); font-weight:700}
-  .c2{color:var(--gold); font-weight:400}
-  .g{color:var(--good)} .w{color:var(--warn)} .r{color:var(--crit)} .n{color:var(--ts)}
+  /* stat chips (home indicator row) */
+  .chips{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+  .chip{background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px}
+  .chip .k{font:600 9.5px var(--mono); color:var(--tf); letter-spacing:.05em; text-transform:uppercase; margin-bottom:3px}
+  .chip .v{font:700 15px var(--mono); color:var(--tp)}
+  .chip .v.good{color:var(--good)} .chip .v.crit{color:var(--crit)} .chip .v.primary{color:var(--primary)}
 
-  .tabs{display:flex; gap:6px; flex-wrap:wrap}
-  .tabs button{
-    flex:1 1 auto; min-width:0; background:transparent; border:1px solid rgba(255,255,255,.12); color:var(--ts);
-    font:600 12px var(--sans); padding:9px 4px; border-radius:9px; cursor:pointer; font-family:var(--sans);
-  }
-  .tabs.mono button{font-family:var(--mono); font-size:12.5px}
-  .tabs button.on{background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.5); color:var(--gold)}
-  #chartTabs button{flex:1 1 29%}
-  .primary-tag{font:600 8.5px var(--mono); color:var(--gold); background:rgba(212,175,55,.14); border:1px solid rgba(212,175,55,.35); border-radius:5px; padding:2px 6px; letter-spacing:.04em}
+  /* mini plan preview */
+  .mini-plan-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:8px}
+  .mini-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+  .mini-stat{text-align:center; background:var(--surface-2); border-radius:10px; padding:9px 4px}
+  .mini-stat .k{font:600 9px var(--mono); color:var(--tf); letter-spacing:.04em; margin-bottom:3px}
+  .mini-stat .v{font:700 13px var(--mono)}
+  .btn-primary{display:block; width:100%; text-align:center; margin-top:12px; padding:12px; border-radius:11px; border:none; background:var(--primary); color:#fff; font:600 12.5px var(--sans); cursor:pointer; box-shadow:0 6px 14px rgba(37,99,235,.22)}
+  .btn-ghost{display:block; width:100%; text-align:center; padding:11px; border-radius:11px; border:1px solid var(--border); background:#fff; color:var(--tp); font:600 12.5px var(--sans); cursor:pointer}
 
-  #chart{height:250px; border-radius:8px; overflow:hidden}
-  .legend{display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font:400 10px var(--sans); color:var(--tm)}
+  /* tf confluence strip */
+  .tf-strip{display:flex; gap:7px; overflow-x:auto; padding-bottom:2px}
+  .tf-chip{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:9px 13px; min-width:52px}
+  .tf-chip.primary{border-color:var(--primary); background:var(--primary-soft)}
+  .tf-chip .n{font:700 10.5px var(--mono); color:var(--tf)}
+  .tf-chip.primary .n{color:var(--primary-dk)}
+  .tf-chip .dot{width:8px; height:8px; border-radius:99px}
+  .dot-up{background:var(--good)} .dot-down{background:var(--crit)} .dot-flat{background:var(--tf)}
+
+  /* accordion (per-TF detail on home) */
+  .acc-item{border-bottom:1px solid var(--border)}
+  .acc-item:last-child{border-bottom:none}
+  .acc-head{display:flex; align-items:center; justify-content:space-between; padding:13px 2px; cursor:pointer; gap:8px}
+  .acc-head .hl{display:flex; align-items:center; gap:8px; min-width:0}
+  .acc-head .n{font:700 12.5px var(--sans); color:var(--tp); white-space:nowrap}
+  .acc-head .arrow{font:400 13px var(--mono); color:var(--tf); transition:transform .2s; flex:none}
+  .acc-item.open .arrow{transform:rotate(90deg)}
+  .acc-body{display:none; padding:0 2px 14px}
+  .acc-item.open .acc-body{display:block}
+  .acc-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px}
+  .acc-stat{background:var(--surface-2); border-radius:9px; padding:8px 10px; min-width:0}
+  .acc-stat .k{font:600 9px var(--mono); color:var(--tf); margin-bottom:2px}
+  .acc-stat .v{font:600 12px var(--mono)}
+  .acc-note{font:400 12px/1.6 var(--sans); color:var(--ts); margin-bottom:10px}
+  .lv-row{display:flex; justify-content:space-between; gap:8px; font:400 11.5px var(--sans); color:var(--tm); padding:3px 0}
+  .lv-row .v{font-family:var(--mono); font-weight:600; text-align:right}
+
+  /* confluence highlight on level numbers */
+  .c3{color:var(--primary-dk); font-weight:700}
+  .c2{color:var(--primary); font-weight:600}
+
+  .primary-tag{font:600 8.5px var(--mono); color:var(--primary-dk); background:var(--primary-soft); border:1px solid #cfe0ff; border-radius:5px; padding:2px 6px; letter-spacing:.04em; flex:none}
+
+  /* chart tab */
+  .seg{display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px}
+  .seg button{flex:1 1 29%; min-width:0; border:none; background:transparent; padding:9px 0; border-radius:9px; font:700 11.5px var(--mono); color:var(--tm); cursor:pointer; font-family:var(--mono)}
+  .seg button.on{background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(15,23,42,.1)}
+  #chart{height:250px; border-radius:10px; overflow:hidden}
+  .legend{display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font:500 10px var(--sans); color:var(--tm)}
   .legend span{display:flex; align-items:center; gap:5px}
   .legend i{width:9px; height:9px; border-radius:2px; display:inline-block; flex:none}
-  .legend i.dash{width:12px; height:0; border-top:1px dashed}
+  .legend i.dash{width:12px; height:0; border-top:2px dashed; border-radius:0}
 
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:9px}
   .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px}
   .grid3 .stat .v{font-size:15px}
-  .stat{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:11px; padding:11px 12px; display:flex; flex-direction:column; gap:4px}
-  .stat .k{font:400 9.5px var(--mono); color:var(--tm); letter-spacing:.08em}
-  .stat .v{font:600 13.5px var(--mono)}
+  .stat{background:var(--surface-2); border:1px solid var(--border); border-radius:11px; padding:11px 12px; display:flex; flex-direction:column; gap:4px}
+  .stat .k{font:600 9.5px var(--mono); color:var(--tf); letter-spacing:.06em}
+  .stat .v{font:700 14px var(--mono); color:var(--tp)}
 
+  /* levels tab */
+  .lv-tf-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:13px 14px; box-shadow:var(--shadow)}
+  .lv-tf-card.primary{border-color:var(--primary); background:var(--primary-soft)}
+  .lv-tf-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .lv-tf-head .n{font:700 12.5px var(--sans); display:flex; align-items:center; gap:7px}
+  .lv-cols{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .lv-col .t{font:600 9.5px var(--mono); color:var(--tf); letter-spacing:.04em; margin-bottom:6px}
+  .lv-tag{display:inline-block; font:600 11px var(--mono); padding:3px 8px; border-radius:7px; margin:0 4px 4px 0}
+  .lv-tag.s{background:var(--good-soft); color:var(--good)}
+  .lv-tag.r{background:var(--crit-soft); color:var(--crit)}
+  .lv-tag.c3{outline:1.5px solid currentColor}
+  .lv-empty{font:400 11.5px var(--sans); color:var(--tf)}
+
+  /* plan tab */
+  .fine{font:400 11px/1.6 var(--sans); color:var(--tm); text-wrap:pretty}
+  .disc{font:400 10.5px/1.6 var(--sans); color:var(--tm); background:var(--warn-soft); border:1px solid #f2dfae; border-radius:10px; padding:10px 12px; text-wrap:pretty}
+  .hist{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); font:400 12.5px var(--sans); color:var(--tm)}
+  .hist:last-child{border-bottom:none}
+  .hist .p{font:600 12.5px var(--mono); color:var(--ts)}
+
+  /* calculator */
+  .tabs{display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px}
+  .tabs button{flex:1 1 auto; min-width:0; background:transparent; border:none; color:var(--tm); font:600 11.5px var(--sans); padding:9px 4px; border-radius:9px; cursor:pointer; font-family:var(--sans)}
+  .tabs button.on{background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(15,23,42,.1)}
   .fields{display:grid; grid-template-columns:1fr 1fr; column-gap:10px; row-gap:16px}
   .field{display:flex; flex-direction:column; gap:6px; min-width:0}
   .field.wide{grid-column:1 / -1}
-  .field label{font:400 10.5px/1.6 var(--sans); color:var(--tm); white-space:nowrap}
+  .field label{font:600 10.5px/1.6 var(--sans); color:var(--tf); white-space:nowrap}
   .field input{
-    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); color:var(--tp);
-    border-radius:9px; padding:10px 11px; font:500 14px var(--mono); width:100%;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--tp);
+    border-radius:9px; padding:10px 11px; font:600 14px var(--mono); width:100%;
   }
-  .field input:focus{outline:none; border-color:rgba(212,175,55,.6)}
+  .field input:focus{outline:none; border-color:var(--primary)}
   .out{
-    background:linear-gradient(150deg,rgba(212,175,55,.14),rgba(26,26,25,.92) 60%);
-    border:1px solid rgba(212,175,55,.3); border-radius:16px; padding:16px;
+    background:linear-gradient(150deg,var(--primary-soft),#fff 60%);
+    border:1px solid #cfe0ff; border-radius:16px; padding:16px;
     display:grid; grid-template-columns:1fr 1fr; gap:14px;
   }
   .out div{display:flex; flex-direction:column; gap:4px; min-width:0}
-  .out .k{font:400 9.5px var(--mono); color:var(--tm); letter-spacing:.08em}
-  .out .v{font:700 19px var(--mono); color:var(--gold); letter-spacing:-.01em}
+  .out .k{font:600 9.5px var(--mono); color:var(--tf); letter-spacing:.06em}
+  .out .v{font:700 18px var(--mono); color:var(--primary-dk); letter-spacing:-.01em}
 
   .split{padding:12px 0; border-bottom:1px solid var(--border)}
   .split:first-child{border-top:1px solid var(--border)}
@@ -146,39 +205,30 @@
   .split .in .field input{padding:8px 9px; font-size:13px}
   .split .outs{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px}
   .split .outs > div{min-width:0}
-  .split .outs .k{font:400 9px var(--mono); color:var(--tm); letter-spacing:.04em; margin-bottom:3px}
+  .split .outs .k{font:600 9px var(--mono); color:var(--tf); letter-spacing:.03em; margin-bottom:3px}
   .split .outs .v{font:600 12.5px var(--mono); color:var(--ts)}
+
   #upd{
     display:none; flex:none; align-items:center; justify-content:space-between; gap:10px;
-    padding:9px 14px; background:rgba(212,175,55,.14); border-bottom:1px solid rgba(212,175,55,.35);
-    font:500 11.5px var(--sans); color:var(--gold);
+    padding:9px 14px; background:var(--primary-soft); border-bottom:1px solid #cfe0ff;
+    font:500 11.5px var(--sans); color:var(--primary-dk);
   }
-  #upd button{background:var(--gold); border:none; color:#0d0d0d; font:700 11px var(--sans); padding:6px 12px; border-radius:7px; cursor:pointer}
-  .hist{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); font:400 12.5px var(--sans); color:var(--tm)}
-  .hist:last-child{border-bottom:none}
-  .hist .p{font:500 12.5px var(--mono); color:var(--ts)}
+  #upd button{background:var(--primary); border:none; color:#fff; font:700 11px var(--sans); padding:6px 12px; border-radius:7px; cursor:pointer}
 
-  .fine{font:400 10.5px/1.6 var(--sans); color:var(--tm); text-wrap:pretty}
-  .disc{font:400 10.5px/1.6 var(--sans); color:var(--tm); background:rgba(250,178,25,.06); border:1px solid rgba(250,178,25,.28); border-radius:10px; padding:10px 12px; text-wrap:pretty}
   .state{padding:60px 0; text-align:center; font:400 13px/1.7 var(--sans); color:var(--tm)}
   .state.err{color:var(--crit)}
 
   nav{
-    flex:none; display:flex; border-top:1px solid var(--border); background:rgba(13,13,13,.97);
-    padding:9px 6px calc(10px + env(safe-area-inset-bottom));
+    flex:none; display:flex; border-top:1px solid var(--border); background:rgba(255,255,255,.95); backdrop-filter:blur(10px);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));
   }
   nav button{
     flex:1; background:transparent; border:none; cursor:pointer; display:flex; flex-direction:column;
-    align-items:center; gap:5px; padding:5px 0; font-family:var(--sans);
+    align-items:center; gap:4px; padding:8px 0 6px; font-family:var(--sans); color:var(--tf); font:600 9px var(--sans);
   }
-  nav i{width:16px; height:16px; border:2px solid var(--tf); background:transparent; display:block}
-  nav span{font:600 10px var(--sans); color:var(--tf)}
-  nav button.on i{border-color:var(--gold); background:rgba(212,175,55,.35)}
-  nav button.on span{color:var(--gold)}
-  nav button:nth-child(1) i{border-radius:4px}
-  nav button:nth-child(2) i{border-radius:2px}
-  nav button:nth-child(3) i{border-radius:50%}
-  nav button:nth-child(4) i{border-radius:4px}
+  nav button svg{width:20px; height:20px; stroke:var(--tf); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+  nav button.on{color:var(--primary)}
+  nav button.on svg{stroke:var(--primary)}
 </style>
 </head>
 <body>
@@ -191,13 +241,13 @@
 </header>
 
 <main>
-  <section class="screen on" id="s-overview">
+  <section class="screen on" id="s-home">
     <div class="state" id="ovState">กำลังโหลดข้อมูล...</div>
-    <div id="ovBody" class="stack" style="gap:14px; display:none"></div>
+    <div id="ovBody" class="stack" style="gap:12px; display:none"></div>
   </section>
 
   <section class="screen" id="s-chart">
-    <div class="tabs mono" id="chartTabs">
+    <div class="seg" id="chartTabs">
       <button data-tf="D">D</button>
       <button data-tf="4h">4H</button>
       <button data-tf="1h" class="on">1H</button>
@@ -205,17 +255,18 @@
       <button data-tf="15m">15M</button>
       <button data-tf="5m">5M</button>
     </div>
-    <div class="card" style="padding:14px 12px 10px">
+    <div class="card" style="padding:14px 12px 10px; margin-top:12px">
       <div style="display:flex; justify-content:space-between; align-items:baseline; padding:0 2px 10px">
-        <span style="font:600 12px var(--mono)" id="chartTitle">1H · CANDLES</span>
-        <span style="font:400 10.5px var(--mono); color:var(--tm)" id="chartRange">—</span>
+        <span style="font:700 12px var(--sans)" id="chartTitle">1H · CANDLES</span>
+        <span style="font:500 10.5px var(--mono); color:var(--tm)" id="chartRange">—</span>
       </div>
       <div id="chart"></div>
       <div class="legend">
-        <span><i style="background:#0ca30c"></i>แท่งขึ้น</span>
-        <span><i style="background:#d03b3b"></i>แท่งลง</span>
-        <span><i class="dash" style="border-color:rgba(12,163,12,.8)"></i>แนวรับ</span>
-        <span><i class="dash" style="border-color:rgba(208,59,59,.8)"></i>แนวต้าน</span>
+        <span><i style="background:#16a34a"></i>แท่งขึ้น</span>
+        <span><i style="background:#dc2626"></i>แท่งลง</span>
+        <span><i class="dash" style="border-color:#16a34a"></i>แนวรับ</span>
+        <span><i class="dash" style="border-color:#dc2626"></i>แนวต้าน</span>
+        <span><i style="background:#2563eb; width:11px; height:3px; border-radius:2px"></i>Supertrend</span>
       </div>
     </div>
     <div class="stack">
@@ -226,6 +277,10 @@
 
   <section class="screen" id="s-plan">
     <div id="planBody"></div>
+  </section>
+
+  <section class="screen" id="s-levels">
+    <div class="stack" id="levelsBody" style="gap:10px"></div>
   </section>
 
   <section class="screen" id="s-calc">
@@ -245,7 +300,7 @@
       <div id="splitRows"></div>
     </div>
     <div class="out" id="calcOut"></div>
-    <div id="calcWarn" style="display:none; font:400 11px/1.6 var(--sans); color:var(--warn); background:rgba(250,178,25,.07); border:1px solid rgba(250,178,25,.3); border-radius:10px; padding:10px 12px; text-wrap:pretty"></div>
+    <div id="calcWarn" style="display:none; font:400 11px/1.6 var(--sans); color:var(--warn); background:var(--warn-soft); border:1px solid #f2dfae; border-radius:10px; padding:10px 12px; text-wrap:pretty"></div>
     <p class="fine" style="margin:0">สมมติทองคำ 1 lot = 100 ออนซ์ (ราคาขยับ $1 = $100 ต่อ 1 lot) ค่าจริงอาจต่างตามโบรกเกอร์ · คำนวณในเครื่องล้วนๆ ไม่เชื่อมต่อบัญชีเทรด</p>
     <div class="card stack" style="gap:2px" id="histCard">
       <span class="lbl" style="margin-bottom:8px">ประวัติล่าสุด</span>
@@ -255,10 +310,26 @@
 </main>
 
 <nav id="nav">
-  <button data-tab="overview" class="on"><i></i><span>สรุป</span></button>
-  <button data-tab="chart"><i></i><span>กราฟ</span></button>
-  <button data-tab="plan"><i></i><span>แผนเทรด</span></button>
-  <button data-tab="calc"><i></i><span>คำนวณ</span></button>
+  <button data-tab="home" class="on">
+    <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+    <span>หน้าหลัก</span>
+  </button>
+  <button data-tab="chart">
+    <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M21 19H3"/></svg>
+    <span>กราฟ</span>
+  </button>
+  <button data-tab="plan">
+    <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+    <span>แผนเทรด</span>
+  </button>
+  <button data-tab="levels">
+    <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="7" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="14" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>
+    <span>แนวรับ-ต้าน</span>
+  </button>
+  <button data-tab="calc">
+    <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M16 15h0"/></svg>
+    <span>คำนวณ</span>
+  </button>
 </nav>
 
 <script>
@@ -277,7 +348,8 @@ const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'
 const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 const fmt = (n, d=2) => n == null ? '-' : n.toLocaleString('en-US',{minimumFractionDigits:d, maximumFractionDigits:d});
 const biasCls = b => ['Long','Short','Wait'].includes(b) ? b : 'Wait';
-const badge = (b, sm) => `<span class="badge b-${biasCls(b)}${sm?' sm':''}">${esc(b || 'Wait')}</span>`;
+const biasTh = b => b === 'Long' ? 'ขึ้น (Long)' : b === 'Short' ? 'ลง (Short)' : 'รอดู';
+const badge = (b, sm) => `<span class="badge b-${biasCls(b)}${sm?' sm':''}"><i></i>${esc(b || 'Wait')}</span>`;
 
 /* ---------- tabs ---------- */
 $('#nav').addEventListener('click', e => {
@@ -286,6 +358,7 @@ $('#nav').addEventListener('click', e => {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   $('#s-' + b.dataset.tab).classList.add('on');
   localStorage.setItem('xau_tab', b.dataset.tab);
+  window.scrollTo(0,0);
   if (b.dataset.tab === 'chart') requestAnimationFrame(() => { buildChart(); chart && chart.timeScale().fitContent(); });
 });
 (function restoreTab(){
@@ -299,6 +372,9 @@ $('#chartTabs').addEventListener('click', e => {
   document.querySelectorAll('#chartTabs button').forEach(x => x.classList.toggle('on', x === b));
   activeTf = b.dataset.tf; drawChart(); renderChartLevels();
 });
+
+function toggleAcc(head){ head.parentElement.classList.toggle('open'); }
+
 /* ---------- load ---------- */
 async function load() {
   try {
@@ -329,11 +405,11 @@ function setLive(text, stale) {
 function render() {
   const age = (Date.now() - new Date(row.created_at).getTime()) / 36e5;
   setLive(age > 6 ? 'STALE' : 'LIVE', age > 6);
-  renderOverview(); renderPlan(); prefillCalc(); calc(); renderHistory();
+  renderHome(); renderPlan(); renderLevels(); prefillCalc(); calc(); renderHistory();
   if ($('#s-chart').classList.contains('on')) { buildChart(); }
 }
 
-/* ---------- confluence ---------- */
+/* ---------- confluence helpers (ใช้ร่วมกันทั้งหน้าหลัก/กราฟ/แนวรับ-ต้าน) ---------- */
 function clusters(items, tol) {
   const out = [];
   [...items].sort((a,b) => a.price - b.price).forEach(it => {
@@ -364,105 +440,152 @@ function levelList(arr, cl, tol) {
   if (!arr || !arr.length) return '-';
   return arr.map(l => { const p = num(l); const c = p ? cls(p, cl, tol) : ''; return c ? `<span class="${c}">${esc(l)}</span>` : esc(l); }).join(', ');
 }
+function levelTags(arr, cl, tol, kind) {
+  if (!arr || !arr.length) return `<span class="lv-empty">-</span>`;
+  return arr.map(l => { const p = num(l); const c = p ? cls(p, cl, tol) : ''; return `<span class="lv-tag ${kind}${c?' '+c:''}">${esc(l)}</span>`; }).join('');
+}
 
-/* ---------- overview ---------- */
-function renderOverview() {
+/* ---------- หน้าหลัก: สรุปประเด็นชัดๆ ---------- */
+function stDotCls(dir) { return dir === 'Bullish' ? 'dot-up' : dir === 'Bearish' ? 'dot-down' : 'dot-flat'; }
+function stTh(dir) { return dir === 'Bullish' ? 'ขาขึ้น' : dir === 'Bearish' ? 'ขาลง' : 'ไม่ชัดเจน'; }
+
+function buildKeyPoints(inds, plan, price, sup, res, tol) {
+  const points = [];
+  const stP = (inds[PRIMARY_TF] || {}).supertrendDirection;
+  const stD = (inds['D'] || {}).supertrendDirection;
+  const st4h = (inds['4h'] || {}).supertrendDirection;
+  if (stP) {
+    const aligned = stD === stP && st4h === stP;
+    points.push({
+      ic: 'ic-trend', icon: '📈',
+      tx: `เทรนด์หลัก ${esc(TF_LABEL[PRIMARY_TF])} เป็น <b>${stTh(stP)} (Supertrend ${esc(stP)})</b>` + (aligned ? ' สอดคล้องกับ D และ 4H ทั้งคู่' : stD && st4h ? ' — D/4H ยังไม่ตรงทิศเดียวกันทั้งหมด' : '')
+    });
+  }
+  if (plan && plan.status_text) {
+    const confirmed = !!plan.confirmed;
+    points.push({ ic: confirmed ? 'ic-signal' : 'ic-wait', icon: confirmed ? '⚡' : '⏳', tx: esc(plan.status_text) });
+  }
+  if (price != null) {
+    const above = res.filter(c => c.avg >= price).sort((a,b) => a.avg - b.avg)[0];
+    const below = sup.filter(c => c.avg <= price).sort((a,b) => b.avg - a.avg)[0];
+    let pick = null, kind = '';
+    if (above && below) { pick = (above.avg - price) <= (price - below.avg) ? above : below; kind = pick === above ? 'แนวต้าน' : 'แนวรับ'; }
+    else if (above) { pick = above; kind = 'แนวต้าน'; }
+    else if (below) { pick = below; kind = 'แนวรับ'; }
+    if (pick) {
+      points.push({ ic: 'ic-risk', icon: '⚠️', tx: `${kind}สำคัญถัดไปอยู่ที่ <b>${fmt(pick.avg)}</b> (ตรงกัน ${pick.tfs.length} TF: ${pick.tfs.map(k=>TF_LABEL[k]).join('·')})` });
+    }
+  }
+  return points;
+}
+
+function renderHome() {
   const t = new Date(row.created_at).toLocaleString('th-TH', { dateStyle:'medium', timeStyle:'short' });
   const { tol, sup, res } = collect();
   const price = num(row.price_snapshot);
-
-  const multi = c => c.tfs.length >= 2;
-  const top = res.filter(c => multi(c) && (price == null || c.avg >= price))
-    .sort((a,b) => b.tfs.length - a.tfs.length || a.avg - b.avg).slice(0, 2)
-    .map(c => ({ ...c, kind:'แนวต้าน', color: c.tfs.length >= 3 ? '#d03b3b' : 'rgba(208,59,59,.6)' }));
-  const bot = sup.filter(c => multi(c) && (price == null || c.avg <= price))
-    .sort((a,b) => b.tfs.length - a.tfs.length || b.avg - a.avg).slice(0, 2)
-    .map(c => ({ ...c, kind:'แนวรับ', color: c.tfs.length >= 3 ? '#0ca30c' : 'rgba(12,163,12,.6)' }));
-  const levels = [...top, ...bot].sort((a,b) => b.avg - a.avg);
-
   const tfs = row.timeframes_json || {}, inds = row.indicators_json || {};
+  const indP = inds[PRIMARY_TF] || {};
+  const plan = row.trade_idea_json || {};
+  const tp = Array.isArray(plan.take_profit) ? plan.take_profit.filter(Boolean) : [];
+  const hasPlan = plan.confirmed && plan.entry_zone && plan.entry_zone !== '-';
+  const points = buildKeyPoints(inds, plan, price, sup, res, tol);
 
   $('#ovState').style.display = 'none';
   const el = $('#ovBody'); el.style.display = 'flex';
   el.innerHTML = `
-    <div class="card gold">
-      <div class="price-top">
-        <div>
-          <div class="lbl">ราคาปัจจุบัน</div>
-          <div class="price" style="margin-top:4px">$${fmt(price)}</div>
-          <div class="updated">อัปเดต ${esc(t)}</div>
-        </div>
-        <div class="side">
-          ${badge(row.bias)}
-          ${row.confidence_score != null ? `<span class="conf"><small>CONFIDENCE</small><b>${esc(row.confidence_score)}%</b></span>` : ''}
-        </div>
+    <div class="hero">
+      <div class="hero-top">
+        <span class="sym">XAU/USD · GOLD SPOT</span>
+        <span class="upd">อัปเดต ${esc(t)}</span>
       </div>
-      <div class="hr"></div>
-      <div class="stack" style="gap:5px">
-        <span class="lbl">แผนโดยรวม · CONFLUENCE</span>
-        <div class="body">${esc(row.plan_summary) || '-'}</div>
+      <div class="hero-price">$${fmt(price)}</div>
+      <div class="hero-sub">เน้นฝั่ง Buy เป็นหลัก · เทรดจบภายในวันเดียว</div>
+      <div class="hero-bias">
+        <span class="pill-on-hero">${row.bias === 'Long' ? '▲' : row.bias === 'Short' ? '▼' : '■'} ${esc((row.bias || 'Wait').toUpperCase())}</span>
+        ${row.confidence_score != null ? `<span class="conf-hero">ความมั่นใจ ${esc(row.confidence_score)}%</span>` : ''}
       </div>
-      ${row.confidence_note ? `<div class="stack" style="gap:5px; margin-top:12px">
-        <span class="lbl">ข้อควรระวัง</span>
-        <div class="body dim">${esc(row.confidence_note)}</div>
-      </div>` : ''}
-      ${row.structure_note ? `<div class="stack" style="gap:5px; margin-top:12px">
-        <span class="lbl">ภาพรวมโครงสร้างราคา</span>
-        <div class="body dim">${esc(row.structure_note)}</div>
-      </div>` : ''}
     </div>
 
-    ${levels.length ? `<div class="stack">
-      <span class="lbl">แนวรับ / แนวต้าน ที่ตรงกันหลาย TIMEFRAME</span>
-      <div class="stack" style="gap:7px">
-        ${levels.map(c => `
-          <div class="lvl">
-            <div class="l">
-              <span class="bar" style="background:${c.color}"></span>
-              <div>
-                <div class="p">${fmt(c.avg)}</div>
-                <div class="k">${c.kind} · ตรงกัน ${c.tfs.length} TF</div>
-              </div>
-            </div>
-            <span class="tf">${c.tfs.map(k => TF_LABEL[k]).join('·')}</span>
-          </div>`).join('')}
+    ${points.length ? `<div class="card">
+      <div class="lbl" style="margin-bottom:12px">ประเด็นสำคัญวันนี้</div>
+      <div class="points">
+        ${points.map(p => `<div class="point"><div class="ic ${p.ic}">${p.icon}</div><div class="tx">${p.tx}</div></div>`).join('')}
       </div>
     </div>` : ''}
 
-    <div class="stack">
-      <span class="lbl">รายละเอียดแต่ละ TIMEFRAME (D → 4H → 1H → 30M → 15M → 5M)</span>
+    <div class="card">
+      <div class="lbl" style="margin-bottom:12px">อินดิเคเตอร์ · TF หลัก (${esc(TF_LABEL[PRIMARY_TF])})</div>
+      <div class="chips">
+        <div class="chip"><div class="k">Supertrend</div><div class="v ${indP.supertrendDirection==='Bullish'?'good':indP.supertrendDirection==='Bearish'?'crit':''}">${esc(indP.supertrendDirection) || '-'}</div></div>
+        <div class="chip"><div class="k">RSI (14)</div><div class="v primary">${indP.rsi14 != null ? esc(indP.rsi14) : '-'}</div></div>
+        <div class="chip"><div class="k">EMA 9 / 21</div><div class="v">${indP.ema9 != null ? esc(indP.ema9) : '-'} / ${indP.ema21 != null ? esc(indP.ema21) : '-'}</div></div>
+        <div class="chip"><div class="k">ATR (14)</div><div class="v">${indP.atr14 != null ? esc(indP.atr14) : '-'}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="mini-plan-head">
+        <span class="lbl">แผนเทรดโดยย่อ</span>
+        ${badge(hasPlan ? plan.direction : 'Wait', true)}
+      </div>
+      ${hasPlan ? `
+      <div class="mini-row">
+        <div class="mini-stat"><div class="k">ENTRY</div><div class="v" style="color:var(--primary)">${esc(plan.entry_zone)}</div></div>
+        <div class="mini-stat"><div class="k">SL</div><div class="v" style="color:var(--crit)">${esc(plan.stop_loss)}</div></div>
+        <div class="mini-stat"><div class="k">TP1</div><div class="v" style="color:var(--good)">${esc(tp[0]) || '-'}</div></div>
+      </div>
+      <button class="btn-primary" id="goPlanBtn">ดูแผนเต็ม + TP2/TP3</button>
+      ` : `<p class="fine" style="margin:0 0 10px">ยังไม่มีสัญญาณเข้าไม้ตอนนี้ — รอ EMA9/21 ตัดกันพร้อม RSI และ Supertrend ยืนยันก่อน</p>
+      <button class="btn-ghost" id="goPlanBtn">ดูรายละเอียดสัญญาณ</button>`}
+    </div>
+
+    <div class="card">
+      <div class="lbl" style="margin-bottom:11px">ภาพรวมทุก Timeframe</div>
+      <div class="tf-strip">
+        ${TF_KEYS.map(k => {
+          const d = stDotCls((inds[k]||{}).supertrendDirection);
+          const isP = k === PRIMARY_TF;
+          return `<div class="tf-chip${isP?' primary':''}"><span class="n">${esc(TF_LABEL[k])}${isP?'★':''}</span><span class="dot ${d}"></span></div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card" style="padding:4px 16px">
       ${TF_KEYS.map(k => {
         const d = tfs[k]; if (!d) return '';
         const i = inds[k] || {};
-        const rk = i.rsiStatus === 'Overbought' ? 'r' : i.rsiStatus === 'Oversold' ? 'g' : 'n';
-        const mk = i.macdStatus === 'Bullish' ? 'g' : i.macdStatus === 'Bearish' ? 'r' : 'n';
-        const stk = i.supertrendDirection === 'Bullish' ? 'g' : i.supertrendDirection === 'Bearish' ? 'r' : 'n';
         const isPrimary = k === PRIMARY_TF;
+        const rk = i.rsiStatus === 'Overbought' ? 'crit' : i.rsiStatus === 'Oversold' ? 'good' : '';
+        const mk = i.macdStatus === 'Bullish' ? 'good' : i.macdStatus === 'Bearish' ? 'crit' : '';
+        const stk = i.supertrendDirection === 'Bullish' ? 'good' : i.supertrendDirection === 'Bearish' ? 'crit' : '';
         return `
-        <div class="tfc">
-          <div class="h"><span class="n">${TF_LABEL[k]}</span>${isPrimary ? '<span class="primary-tag">TF หลัก</span>' : ''}${badge(d.bias, true)}</div>
-          <div class="t">เทรนด์ (Supertrend): <b class="${stk}">${esc(i.supertrendDirection) || esc(d.trend) || '-'}</b></div>
-          <div class="note">${esc(d.structure_note) || '-'}</div>
-          ${d.smc_zones ? `<div class="smc">SMC: ${esc(d.smc_zones)}</div>` : ''}
-          <div class="lv">
-            <div><div class="lbl">แนวรับ</div>${levelList(d.support_levels, sup, tol)}</div>
-            <div><div class="lbl">แนวต้าน</div>${levelList(d.resistance_levels, res, tol)}</div>
+        <div class="acc-item${isPrimary?' open':''}">
+          <div class="acc-head" onclick="toggleAcc(this)">
+            <div class="hl"><span class="n">${esc(TF_LABEL[k])}${isPrimary?' — รายละเอียดเต็ม':''}</span>${isPrimary?'<span class="primary-tag">TF หลัก</span>':''}${badge(d.bias, true)}</div>
+            <span class="arrow">›</span>
           </div>
-          <div class="ind">
-            <span>RSI <b class="${rk}">${i.rsi14 != null ? esc(i.rsi14) : '-'}</b></span>
-            <span>MACD <b class="${mk}">${esc(i.macdStatus || 'Neutral')}</b></span>
-            <span>EMA9/21 <b class="n">${i.ema9 != null ? esc(i.ema9) : '-'} / ${i.ema21 != null ? esc(i.ema21) : '-'}</b></span>
-            <span>ATR <b class="n">${i.atr14 != null ? esc(i.atr14) : '-'}</b></span>
+          <div class="acc-body">
+            <div class="acc-grid">
+              <div class="acc-stat"><div class="k">Supertrend</div><div class="v" style="${stk?`color:var(--${stk})`:''}">${esc(i.supertrendDirection) || '-'}</div></div>
+              <div class="acc-stat"><div class="k">RSI / MACD</div><div class="v">${i.rsi14 != null ? esc(i.rsi14) : '-'} · <span style="${mk?`color:var(--${mk})`:''}">${esc(i.macdStatus || 'Neutral')}</span></div></div>
+            </div>
+            ${d.structure_note ? `<div class="acc-note">${esc(d.structure_note)}</div>` : ''}
+            ${d.smc_zones ? `<div class="acc-note" style="margin-top:-6px; color:var(--tm)">SMC: ${esc(d.smc_zones)}</div>` : ''}
+            <div class="lv-row"><span>แนวรับ</span><span class="v">${levelList(d.support_levels, sup, tol)}</span></div>
+            <div class="lv-row"><span>แนวต้าน</span><span class="v">${levelList(d.resistance_levels, res, tol)}</span></div>
           </div>
         </div>`;
       }).join('')}
     </div>
 
-    <div class="fine" style="margin-bottom:2px">
-      <span class="c3">ตัวหนาสีทอง</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีทองปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe · <span class="primary-tag" style="padding:1px 5px">TF หลัก</span> = ใช้สร้างสัญญาณเข้าไม้จริง (${TF_LABEL[PRIMARY_TF]})
+    <div class="fine" style="padding:0 2px">
+      <span class="c3">ตัวหนาสีฟ้าเข้ม</span> = ตรงกัน ${CONFLUENCE_STRONG}+ จาก 6 timeframe · <span class="c2">สีฟ้าปกติ</span> = ตรงกัน ${CONFLUENCE_MED}-${CONFLUENCE_STRONG-1} timeframe
     </div>
     <div class="disc">⚠️ สรุปโครงสร้างราคาด้วย AI เพื่อประกอบการตัดสินใจของผู้ใช้เอง ไม่ใช่คำแนะนำการลงทุน เน้นฝั่ง Buy เป็นหลัก เทรดจบภายในวันเดียว ไม่มีการเชื่อมต่อบัญชีเทรดจริงหรือส่งคำสั่งซื้อขายใดๆ</div>
   `;
+
+  const goBtn = document.getElementById('goPlanBtn');
+  if (goBtn) goBtn.onclick = () => document.querySelector('#nav button[data-tab="plan"]').click();
 }
 
 /* ---------- chart ---------- */
@@ -470,19 +593,19 @@ function buildChart() {
   if (chart || typeof LightweightCharts === 'undefined') { drawChart(); return; }
   chart = LightweightCharts.createChart($('#chart'), {
     autoSize: true,
-    layout: { background: { color: 'transparent' }, textColor: '#898781', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 },
-    grid: { vertLines: { color: 'rgba(255,255,255,.05)' }, horzLines: { color: 'rgba(255,255,255,.05)' } },
-    rightPriceScale: { borderColor: 'rgba(255,255,255,.12)' },
-    timeScale: { borderColor: 'rgba(255,255,255,.12)', timeVisible: true, secondsVisible: false },
-    crosshair: { vertLine: { color: 'rgba(212,175,55,.5)' }, horzLine: { color: 'rgba(212,175,55,.5)' } },
+    layout: { background: { color: 'transparent' }, textColor: '#64748b', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 },
+    grid: { vertLines: { color: 'rgba(15,23,42,.055)' }, horzLines: { color: 'rgba(15,23,42,.055)' } },
+    rightPriceScale: { borderColor: '#e3e9f3' },
+    timeScale: { borderColor: '#e3e9f3', timeVisible: true, secondsVisible: false },
+    crosshair: { vertLine: { color: 'rgba(37,99,235,.45)' }, horzLine: { color: 'rgba(37,99,235,.45)' } },
     handleScale: { axisPressedMouseMove: false }
   });
   series = chart.addCandlestickSeries({
-    upColor: '#0ca30c', downColor: '#d03b3b', borderVisible: false,
-    wickUpColor: '#0ca30c', wickDownColor: '#d03b3b'
+    upColor: '#16a34a', downColor: '#dc2626', borderVisible: false,
+    wickUpColor: '#16a34a', wickDownColor: '#dc2626'
   });
-  stUpSeries = chart.addLineSeries({ color: 'rgba(12,163,12,.85)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-  stDownSeries = chart.addLineSeries({ color: 'rgba(208,59,59,.85)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  stUpSeries = chart.addLineSeries({ color: 'rgba(22,163,74,.9)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  stDownSeries = chart.addLineSeries({ color: 'rgba(220,38,38,.9)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
   drawChart(); renderChartLevels();
 }
 
@@ -519,8 +642,8 @@ function drawChart() {
 
   priceLines.forEach(l => series.removePriceLine(l)); priceLines = [];
   const d = (row.timeframes_json || {})[activeTf] || {};
-  (d.support_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(12,163,12,.7)', lineWidth:1, lineStyle:2, title:'S' })); });
-  (d.resistance_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(208,59,59,.7)', lineWidth:1, lineStyle:2, title:'R' })); });
+  (d.support_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(22,163,74,.75)', lineWidth:1, lineStyle:2, title:'S' })); });
+  (d.resistance_levels || []).forEach(l => { const p = num(l); if (p) priceLines.push(series.createPriceLine({ price:p, color:'rgba(220,38,38,.75)', lineWidth:1, lineStyle:2, title:'R' })); });
 
   // เส้น Entry/SL/TP1-3 — แสดงเฉพาะตอนดู TF หลัก และสัญญาณคอนเฟิร์มแล้วเท่านั้น
   if (activeTf === PRIMARY_TF) {
@@ -528,9 +651,9 @@ function drawChart() {
     if (ti.confirmed) {
       const entry = num(ti.entry_zone), sl = num(ti.stop_loss);
       const tp = Array.isArray(ti.take_profit) ? ti.take_profit.map(num) : [];
-      if (entry) priceLines.push(series.createPriceLine({ price: entry, color: 'rgba(212,175,55,.9)', lineWidth: 2, lineStyle: 0, title: 'ENTRY' }));
-      if (sl) priceLines.push(series.createPriceLine({ price: sl, color: 'rgba(208,59,59,.9)', lineWidth: 1, lineStyle: 2, title: 'SL' }));
-      tp.forEach((p, idx) => { if (p) priceLines.push(series.createPriceLine({ price: p, color: 'rgba(12,163,12,.9)', lineWidth: 1, lineStyle: 2, title: 'TP' + (idx + 1) })); });
+      if (entry) priceLines.push(series.createPriceLine({ price: entry, color: 'rgba(37,99,235,.9)', lineWidth: 2, lineStyle: 0, title: 'ENTRY' }));
+      if (sl) priceLines.push(series.createPriceLine({ price: sl, color: 'rgba(220,38,38,.9)', lineWidth: 1, lineStyle: 2, title: 'SL' }));
+      tp.forEach((p, idx) => { if (p) priceLines.push(series.createPriceLine({ price: p, color: 'rgba(22,163,74,.9)', lineWidth: 1, lineStyle: 2, title: 'TP' + (idx + 1) })); });
     }
   }
 }
@@ -540,8 +663,8 @@ function renderChartLevels() {
   const d = (row.timeframes_json || {})[activeTf] || {};
   const { tol, sup, res } = collect();
   $('#chartLevels').innerHTML = `
-    <div class="stat"><div class="k">แนวรับ</div><div class="v n" style="font-size:12px; line-height:1.6">${levelList(d.support_levels, sup, tol)}</div></div>
-    <div class="stat"><div class="k">แนวต้าน</div><div class="v n" style="font-size:12px; line-height:1.6">${levelList(d.resistance_levels, res, tol)}</div></div>
+    <div class="stat"><div class="k">แนวรับ</div><div class="v" style="font-size:12px; font-weight:400; line-height:1.6">${levelList(d.support_levels, sup, tol)}</div></div>
+    <div class="stat"><div class="k">แนวต้าน</div><div class="v" style="font-size:12px; font-weight:400; line-height:1.6">${levelList(d.resistance_levels, res, tol)}</div></div>
   `;
 }
 
@@ -576,10 +699,10 @@ function planCard(title, plan) {
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
         <span class="lbl">${esc(title)}</span>
-        ${badge(dir, true).replace('b-Wait','b-'+dir)}
+        ${badge(dir, true)}
       </div>
       <div class="grid2">
-        <div class="stat"><div class="k">ENTRY</div><div class="v" style="color:var(--gold)">${esc(plan.entry_zone)}</div></div>
+        <div class="stat"><div class="k">ENTRY</div><div class="v" style="color:var(--primary)">${esc(plan.entry_zone)}</div></div>
         <div class="stat"><div class="k">STOP LOSS</div><div class="v" style="color:var(--crit)">${esc(plan.stop_loss) || '-'}</div></div>
       </div>
       <div class="grid3" style="margin-top:9px">
@@ -591,7 +714,7 @@ function planCard(title, plan) {
         <div class="stat"><div class="k">R:R (TP1)</div><div class="v">${esc(plan.rr_ratio) || '-'}</div></div>
       </div>
       <div class="fine" style="margin-top:12px">${esc(plan.note) || 'ตัวเลข Entry / SL / TP คำนวณจาก ATR ล้วนๆ ไม่ใช่คำสั่งที่ต้องทำตาม โปรดบริหารความเสี่ยงของตัวเองทุกครั้ง และปิดไม้ภายในวันนี้'}</div>
-      <button id="usePlan" style="margin-top:14px; width:100%; padding:11px; border-radius:10px; border:1px solid rgba(212,175,55,.5); background:rgba(212,175,55,.12); color:var(--gold); font:600 12.5px var(--sans); cursor:pointer">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
+      <button id="usePlan" class="btn-primary">ส่งตัวเลขนี้ไปหน้าคำนวณ</button>
     </div>
     ${detailCard}
   `;
@@ -619,6 +742,29 @@ function renderPlan() {
     </div>
   `;
   wireUsePlanButton(plan);
+}
+
+/* ---------- แนวรับ-แนวต้าน (ทุก TF ในที่เดียว) ---------- */
+function renderLevels() {
+  if (!row) return;
+  const tfs = row.timeframes_json || {}, inds = row.indicators_json || {};
+  const { tol, sup, res } = collect();
+  $('#levelsBody').innerHTML = TF_KEYS.map(k => {
+    const d = tfs[k]; if (!d) return '';
+    const isPrimary = k === PRIMARY_TF;
+    const dir = stDotCls((inds[k]||{}).supertrendDirection);
+    return `
+    <div class="lv-tf-card${isPrimary ? ' primary' : ''}">
+      <div class="lv-tf-head">
+        <span class="n">${esc(TF_LABEL[k])}${isPrimary ? ' ★ TF หลัก' : ''}<span class="dot ${dir}" style="margin-left:7px"></span></span>
+        ${badge(d.bias, true)}
+      </div>
+      <div class="lv-cols">
+        <div class="lv-col"><div class="t">แนวรับ</div>${levelTags(d.support_levels, sup, tol, 's')}</div>
+        <div class="lv-col"><div class="t">แนวต้าน</div>${levelTags(d.resistance_levels, res, tol, 'r')}</div>
+      </div>
+    </div>`;
+  }).join('') + `<div class="fine" style="padding:2px">กรอบเส้นรอบตัวเลข = แนวราคาที่ตรงกันตั้งแต่ ${CONFLUENCE_MED} timeframe ขึ้นไป</div>`;
 }
 
 /* ---------- calculator (แบ่งไม้) ---------- */
